@@ -49,6 +49,30 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # For adding Automated tests
+  gem "rspec-rails", "~> 7.1"
+
+  # Code style checking for RSpec files.
+  gem "rubocop-rspec", require: false
+
+  # RSpec Rails-specific analysis for one's projects
+  gem "rubocop-rspec_rails", require: false
+
+  # Ruby code style checking and code formatting tool.
+  gem "rubocop", require: false
+
+  # DSL for defining and using factories
+  gem "factory_bot_rails"
+
+  # RSpec matchers to test common Rails functionality
+  gem "shoulda-matchers", "~> 6.0"
+
+  # Useful for debugging purposes
+  gem "pry-byebug"
+
+  # Annotate Rails classes with schema and routes info
+  gem "annotaterb"
 end
 
 group :development do
