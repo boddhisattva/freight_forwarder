@@ -43,6 +43,9 @@ gem "thruster", require: false
 # Catch unsafe migrations in development
 gem "strong_migrations"
 
+# Money handling
+gem "money-rails", "~> 1.15"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
