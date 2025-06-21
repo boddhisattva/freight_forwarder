@@ -14,6 +14,8 @@ class RouteFinderService
     case criteria
     when "cheapest-direct"
       RouteStrategies::CheapestDirectStrategy.new(@repository)
+    when "cheapest"
+      RouteStrategies::CheapestStrategy.new(@repository)
     else
       raise ArgumentError, "Unknown criteria: #{criteria}"
     end
