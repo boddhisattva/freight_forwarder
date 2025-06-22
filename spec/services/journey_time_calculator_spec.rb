@@ -1,41 +1,44 @@
 require 'rails_helper'
-
 RSpec.describe JourneyTimeCalculator do
-  subject(:calculator) { described_class.new }
+  let(:calculator) { described_class.new }
 
-  describe '#calculate_total_time' do
-    it 'returns sailing duration for direct sailing' do
-      result = calculator.calculate_total_time(nil, Date.parse('2022-01-01'), Date.parse('2022-01-10'))
-      expect(result).to eq(9)
+  describe 'inheritance' do
+    it 'inherits from JourneyCalculator' do
+      expect(described_class.superclass).to eq(JourneyCalculator)
     end
 
-    it 'returns layover + sailing duration for multi-leg' do
-      result = calculator.calculate_total_time(Date.parse('2022-01-01'), Date.parse('2022-01-05'), Date.parse('2022-01-10'))
-      # Layover: 4 days, Sailing: 5 days
-      expect(result).to eq(9)
-    end
-
-    it 'returns 0 layover if next ship departs same day' do
-      result = calculator.calculate_total_time(Date.parse('2022-01-01'), Date.parse('2022-01-01'), Date.parse('2022-01-05'))
-      expect(result).to eq(4)
+    it 'inherits valid_connection? method' do
+      expect(calculator).to respond_to(:valid_connection?)
     end
   end
 
-  describe '#valid_connection?' do
-    let(:prev) { build_stubbed(:sailing, arrival_date: Date.parse('2022-01-01')) }
-    let(:curr) { build_stubbed(:sailing, departure_date: Date.parse('2022-01-02')) }
+  describe '#calculate_total_time' do
+    let(:departure_date) { Date.parse('2022-02-16') }
+    let(:arrival_date) { Date.parse('2022-02-20') }
 
-    it 'returns true for first ship' do
-      expect(calculator.valid_connection?(nil, curr)).to be true
+    context 'when first sailing (no layover)' do
+      it 'returns sailing duration only' do
+        total_time = calculator.calculate_total_time(nil, departure_date, arrival_date)
+        expect(total_time).to eq(4) # 4 days sailing
+      end
     end
 
-    it 'returns true if current departs after previous arrives' do
-      expect(calculator.valid_connection?(prev, curr)).to be true
+    context 'when connecting sailing (with layover)' do
+      let(:previous_arrival) { Date.parse('2022-02-12') }
+
+      it 'returns layover time plus sailing time' do
+        total_time = calculator.calculate_total_time(previous_arrival, departure_date, arrival_date)
+        expect(total_time).to eq(8) # 4 days layover + 4 days sailing
+      end
     end
 
-    it 'returns false if current departs before previous arrives' do
-      curr2 = build_stubbed(:sailing, departure_date: Date.parse('2021-12-31'))
-      expect(calculator.valid_connection?(prev, curr2)).to be false
+    context 'when no layover needed (immediate connection)' do
+      let(:previous_arrival) { Date.parse('2022-02-16') }
+
+      it 'returns sailing time only when no waiting required' do
+        total_time = calculator.calculate_total_time(previous_arrival, departure_date, arrival_date)
+        expect(total_time).to eq(4) # 0 days layover + 4 days sailing
+      end
     end
   end
 end
