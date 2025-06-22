@@ -3,6 +3,7 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
+      MAX_HOPS: 4
       POSTGRES_DB: freight_forwarder_production
       POSTGRES_USER: freight_user
       POSTGRES_PASSWORD: freight_password

@@ -9,7 +9,8 @@
 # Phase 4: Find Relevant Ports by intersection of forward_reachable and backward_reachable ports
 # Phase 5: Load Filtered Sailings
 class PortConnectivityFilter
-  MAX_HOPS = 4 # Reasonable limit for shipping routes TODO: Make this configurable
+  # the maximum number of stops (or 'hops') allowed between the origin and destination ports
+  MAX_HOPS = Rails.application.config.max_hops
 
   def initialize(max_hops: MAX_HOPS)
     @max_hops = max_hops
