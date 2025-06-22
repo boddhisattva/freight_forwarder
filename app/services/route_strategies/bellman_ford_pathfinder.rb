@@ -8,7 +8,7 @@ module RouteStrategies
       find_optimal_shipping_routes(shipping_routes, state, cost_calculator)
 
       return [] if state[:distances][end_port] == INFINITY
-      reconstruct_path(state, start_port, end_port)
+      reconstruct_shipping_itinerary(state, start_port, end_port)
     end
 
     private
@@ -34,9 +34,9 @@ module RouteStrategies
       shipping_routes.keys
     end
 
-    # Each route is basically an edge in our shipping_routes
+    # Each route is basically a shipping lane in our shipping_routes
     def destination_ports_from_route(shipping_routes)
-      shipping_routes.values.flat_map { |edges| edges.map { |e| e[:destination] } }
+      shipping_routes.values.flat_map { |available_routes| available_routes.map { |route| route[:destination] } }
     end
 
     def find_optimal_shipping_routes(shipping_routes, state, cost_calculator)
@@ -53,12 +53,11 @@ module RouteStrategies
     def review_available_shipping_paths(shipping_routes, state, cost_calculator)
       updated = false
 
-      shipping_routes.each do |source_port, edges|
+      shipping_routes.each do |source_port, available_routes|
         next if state[:distances][source_port] == INFINITY
 
-
-        edges.each do |edge|
-          if better_shipping_connection_path?(source_port, edge, state, cost_calculator)
+        available_routes.each do |route|
+          if better_shipping_connection_path?(source_port, route, state, cost_calculator)
             updated = true
           end
         end
@@ -67,10 +66,9 @@ module RouteStrategies
       updated
     end
 
-    def better_shipping_connection_path?(source_port, edge, state, cost_calculator)
-      destination_port = edge[:destination]
-      sailing = edge[:sailing]
-
+    def better_shipping_connection_path?(source_port, route, state, cost_calculator)
+      destination_port = route[:destination]
+      sailing = route[:sailing]
 
       # Check connection timing
       return false unless cost_calculator.valid_connection?(
@@ -78,38 +76,36 @@ module RouteStrategies
         sailing
       )
 
-
-      route_cost = edge[:cost_cents]
+      route_cost = route[:cost_cents]
       new_cost = state[:distances][source_port] + route_cost
-
 
       # Is this new route cheaper than what we found before?
       if new_cost < state[:distances][destination_port]
-        # Yes! Update our records with this better route
-        update_shortest_path(destination_port, new_cost, sailing, source_port, state)
+        # Yes! Update our records with this better shipping route
+        update_shortest_shipping_path(destination_port, new_cost, sailing, source_port, state)
         return true
       end
 
       false
     end
 
-    def update_shortest_path(destination_port, new_cost, sailing, source_port, state)
+    def update_shortest_shipping_path(destination_port, new_cost, sailing, source_port, state)
       state[:distances][destination_port] = new_cost # Update best cost
       state[:previous_sailing][destination_port] = sailing # Remember which ship sailing we took
       state[:previous_port][destination_port] = source_port # Remember which port we came from
     end
 
-    def reconstruct_path(state, start_port, end_port)
-      path = []
+    def reconstruct_shipping_itinerary(state, start_port, end_port)
+      shipping_itinerary = []
       current = end_port
 
       while current != start_port && state[:previous_sailing][current]
         sailing = state[:previous_sailing][current]
-        path.unshift(sailing)
+        shipping_itinerary.unshift(sailing) # Add to front (since we're going backwards)
         current = state[:previous_port][current]
       end
 
-      current == start_port ? path : []
+      current == start_port ? shipping_itinerary : []
     end
   end
 end
