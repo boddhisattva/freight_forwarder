@@ -141,6 +141,168 @@ RSpec.describe RouteStrategies::DijkstraPathfinder do
       end
     end
 
+    context 'with 3+ leg routes' do
+      let(:leg1_sailing) { build_stubbed(:sailing, sailing_code: 'LEG1', origin_port: 'CNSHA', destination_port: 'ESBCN') }
+      let(:leg2_sailing) { build_stubbed(:sailing, sailing_code: 'LEG2', origin_port: 'ESBCN', destination_port: 'NLRTM') }
+      let(:leg3_sailing) { build_stubbed(:sailing, sailing_code: 'LEG3', origin_port: 'NLRTM', destination_port: 'BRSSZ') }
+      let(:leg4_sailing) { build_stubbed(:sailing, sailing_code: 'LEG4', origin_port: 'BRSSZ', destination_port: 'USNYC') }
+
+      let(:direct_slow) { build_stubbed(:sailing, sailing_code: 'SLOW_DIRECT', origin_port: 'CNSHA', destination_port: 'USNYC') }
+
+      let(:four_leg_graph) do
+        Hash.new { |h, k| h[k] = [] }.tap do |g|
+          g['CNSHA'] = [
+            {
+              sailing: leg1_sailing,
+              destination: 'ESBCN',
+              departure_date: DateTime.parse('2022-01-29'),
+              arrival_date: DateTime.parse('2022-02-05'),
+              duration: 7
+            },
+            {
+              sailing: direct_slow,
+              destination: 'USNYC',
+              departure_date: DateTime.parse('2022-01-30'),
+              arrival_date: DateTime.parse('2022-04-30'), # 90 days - very slow
+              duration: 90
+            }
+          ]
+          g['ESBCN'] = [
+            {
+              sailing: leg2_sailing,
+              destination: 'NLRTM',
+              departure_date: DateTime.parse('2022-02-10'),
+              arrival_date: DateTime.parse('2022-02-15'),
+              duration: 5
+            }
+          ]
+          g['NLRTM'] = [
+            {
+              sailing: leg3_sailing,
+              destination: 'BRSSZ',
+              departure_date: DateTime.parse('2022-02-20'),
+              arrival_date: DateTime.parse('2022-03-01'),
+              duration: 9
+            }
+          ]
+          g['BRSSZ'] = [
+            {
+              sailing: leg4_sailing,
+              destination: 'USNYC',
+              departure_date: DateTime.parse('2022-03-05'),
+              arrival_date: DateTime.parse('2022-03-12'),
+              duration: 7
+            }
+          ]
+        end
+      end
+
+      before do
+        allow(journey_calculator).to receive(:valid_connection?).and_return(true)
+
+        # 4-leg route timing: Jan 29 -> Mar 12 with proper waiting
+        allow(journey_calculator).to receive(:calculate_total_time)
+          .with(nil, DateTime.parse('2022-01-29'), DateTime.parse('2022-02-05'))
+          .and_return(7) # LEG1: 7 days
+
+        allow(journey_calculator).to receive(:calculate_total_time)
+          .with(DateTime.parse('2022-02-05'), DateTime.parse('2022-02-10'), DateTime.parse('2022-02-15'))
+          .and_return(10) # LEG2: 5 days wait + 5 days travel
+
+        allow(journey_calculator).to receive(:calculate_total_time)
+          .with(DateTime.parse('2022-02-15'), DateTime.parse('2022-02-20'), DateTime.parse('2022-03-01'))
+          .and_return(14) # LEG3: 5 days wait + 9 days travel
+
+        allow(journey_calculator).to receive(:calculate_total_time)
+          .with(DateTime.parse('2022-03-01'), DateTime.parse('2022-03-05'), DateTime.parse('2022-03-12'))
+          .and_return(11) # LEG4: 4 days wait + 7 days travel
+
+        # Total 4-leg: 7 + 10 + 14 + 11 = 42 days vs direct 90 days
+
+        # Direct route: 90 days (much slower)
+        allow(journey_calculator).to receive(:calculate_total_time)
+          .with(nil, DateTime.parse('2022-01-30'), DateTime.parse('2022-04-30'))
+          .and_return(90)
+      end
+
+      it 'finds optimal 4-leg route when faster than direct' do
+        result = pathfinder.find_shortest_path(four_leg_graph, 'CNSHA', 'USNYC', journey_calculator)
+
+        # 4-leg route: 42 days vs direct 90 days
+        expect(result).to eq([ leg1_sailing, leg2_sailing, leg3_sailing, leg4_sailing ])
+      end
+
+      it 'finds 3-leg route to intermediate destination' do
+        result = pathfinder.find_shortest_path(four_leg_graph, 'CNSHA', 'BRSSZ', journey_calculator)
+
+        # 3-leg route: CNSHA->ESBCN->NLRTM->BRSSZ
+        expect(result).to eq([ leg1_sailing, leg2_sailing, leg3_sailing ])
+      end
+
+      it 'respects connection timing for multi-leg routes' do
+        # Break connection between leg 2 and leg 3
+        allow(journey_calculator).to receive(:valid_connection?)
+          .with(leg2_sailing, leg3_sailing).and_return(false)
+
+        result = pathfinder.find_shortest_path(four_leg_graph, 'CNSHA', 'USNYC', journey_calculator)
+
+        # Should fallback to slow direct route when multi-leg connection breaks
+        expect(result).to eq([ direct_slow ])
+      end
+
+      it 'handles complex network with multiple 3+ leg options' do
+        # Add alternative 3-leg route via DEHAM
+        alt_leg2 = build_stubbed(:sailing, sailing_code: 'ALT2', origin_port: 'ESBCN', destination_port: 'DEHAM')
+        alt_leg3 = build_stubbed(:sailing, sailing_code: 'ALT3', origin_port: 'DEHAM', destination_port: 'USNYC')
+
+        complex_graph = four_leg_graph.deep_dup
+        complex_graph['ESBCN'] << {
+          sailing: alt_leg2,
+          destination: 'DEHAM',
+          departure_date: DateTime.parse('2022-02-10'),
+          arrival_date: DateTime.parse('2022-02-14'),
+          duration: 4
+        }
+        complex_graph['DEHAM'] = [
+          {
+            sailing: alt_leg3,
+            destination: 'USNYC',
+            departure_date: DateTime.parse('2022-02-18'),
+            arrival_date: DateTime.parse('2022-02-25'),
+            duration: 7
+          }
+        ]
+
+        # Alternative 3-leg route timing: Jan 29 -> Feb 25 = 27 days total
+        allow(journey_calculator).to receive(:calculate_total_time)
+          .with(DateTime.parse('2022-02-05'), DateTime.parse('2022-02-10'), DateTime.parse('2022-02-14'))
+          .and_return(9) # ALT2: 5 days wait + 4 days travel
+
+        allow(journey_calculator).to receive(:calculate_total_time)
+          .with(DateTime.parse('2022-02-14'), DateTime.parse('2022-02-18'), DateTime.parse('2022-02-25'))
+          .and_return(11) # ALT3: 4 days wait + 7 days travel
+
+        result = pathfinder.find_shortest_path(complex_graph, 'CNSHA', 'USNYC', journey_calculator)
+
+        # Should choose fastest: 3-leg via DEHAM: 7 + 9 + 11 = 27 days vs 4-leg 42 days
+        expect(result.map(&:sailing_code)).to eq([ 'LEG1', 'ALT2', 'ALT3' ])
+      end
+
+      it 'maintains valid timing sequence for 4-leg routes' do
+        result = pathfinder.find_shortest_path(four_leg_graph, 'CNSHA', 'USNYC', journey_calculator)
+
+        # Verify connection timing is checked for each transition
+        expect(journey_calculator).to have_received(:valid_connection?)
+          .with(nil, leg1_sailing)
+        expect(journey_calculator).to have_received(:valid_connection?)
+          .with(leg1_sailing, leg2_sailing)
+        expect(journey_calculator).to have_received(:valid_connection?)
+          .with(leg2_sailing, leg3_sailing)
+        expect(journey_calculator).to have_received(:valid_connection?)
+          .with(leg3_sailing, leg4_sailing)
+      end
+    end
+
     context 'with priority queue behavior' do
       let(:route_a) { build_stubbed(:sailing, sailing_code: 'A') }
       let(:route_b) { build_stubbed(:sailing, sailing_code: 'B') }
@@ -328,6 +490,36 @@ RSpec.describe RouteStrategies::DijkstraPathfinder do
         expect(result.first.destination_port).to eq('ESBCN')
         expect(result.last.origin_port).to eq('ESBCN')
         expect(result.last.destination_port).to eq('BRSSZ')
+      end
+
+      it 'finds fastest 3+ leg route with created test data' do
+        # Create additional test ports and routes for 3+ leg testing
+        # CNSHA -> ESBCN -> NLRTM -> BRSSZ -> USNYC (4 legs)
+        create(:sailing,
+          origin_port: 'BRSSZ', destination_port: 'USNYC',
+          departure_date: Date.parse('2022-03-20'), arrival_date: Date.parse('2022-03-25'),
+          sailing_code: 'BRSSZ_USNYC'
+        )
+
+        # Rebuild network with new route
+        shipping_network = Hash.new { |h, k| h[k] = [] }
+        Sailing.all.each do |sailing|
+          shipping_network[sailing.origin_port] << {
+            sailing: sailing,
+            destination: sailing.destination_port,
+            departure_date: sailing.departure_date.to_datetime,
+            arrival_date: sailing.arrival_date.to_datetime
+          }
+        end
+
+        real_journey_calculator = JourneyTimeCalculator.new
+        result = pathfinder.find_shortest_path(shipping_network, 'CNSHA', 'USNYC', real_journey_calculator)
+
+        # Should find a multi-hop route (likely 3+ legs)
+        expect(result).not_to be_empty
+        expect(result.length).to be >= 3
+        expect(result.first.origin_port).to eq('CNSHA')
+        expect(result.last.destination_port).to eq('USNYC')
       end
     end
   end

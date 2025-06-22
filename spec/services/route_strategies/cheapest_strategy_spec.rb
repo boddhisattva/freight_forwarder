@@ -78,6 +78,95 @@ RSpec.describe RouteStrategies::CheapestStrategy do
       end
     end
 
+    context 'with 3+ leg routes' do
+      before do
+        create_three_plus_leg_data
+      end
+
+      it 'finds optimal 4-leg route when cheaper than alternatives' do
+        result = strategy.find_route('CNSHA', 'USNYC')
+
+        # 4-leg route should be: CNSHA->ESBCN->NLRTM->BRSSZ->USNYC
+        expect(result.size).to eq(4)
+        expect(result[0][:sailing_code]).to eq('LEG1')
+        expect(result[1][:sailing_code]).to eq('LEG2')
+        expect(result[2][:sailing_code]).to eq('LEG3')
+        expect(result[3][:sailing_code]).to eq('LEG4')
+      end
+
+      it 'returns correct sequence for 4-leg route' do
+        result = strategy.find_route('CNSHA', 'USNYC')
+
+        expect(result[0][:origin_port]).to eq('CNSHA')
+        expect(result[0][:destination_port]).to eq('ESBCN')
+
+        expect(result[1][:origin_port]).to eq('ESBCN')
+        expect(result[1][:destination_port]).to eq('NLRTM')
+
+        expect(result[2][:origin_port]).to eq('NLRTM')
+        expect(result[2][:destination_port]).to eq('BRSSZ')
+
+        expect(result[3][:origin_port]).to eq('BRSSZ')
+        expect(result[3][:destination_port]).to eq('USNYC')
+      end
+
+      it 'finds 3-leg route to intermediate destination' do
+        result = strategy.find_route('CNSHA', 'BRSSZ')
+
+        # 3-leg route: CNSHA->ESBCN->NLRTM->BRSSZ
+        expect(result.size).to eq(3)
+        expect(result[0][:sailing_code]).to eq('LEG1')
+        expect(result[1][:sailing_code]).to eq('LEG2')
+        expect(result[2][:sailing_code]).to eq('LEG3')
+      end
+
+      it 'calculates total cost correctly for multi-leg routes' do
+        result = strategy.find_route('CNSHA', 'BRSSZ')
+
+        # Should be cheaper than any direct alternative
+        total_cost_eur = result.sum do |leg|
+          rate = BigDecimal(leg[:rate])
+          if leg[:rate_currency] == 'EUR'
+            rate
+          else
+            # Convert using exchange rate for departure date
+            exchange_rate = ExchangeRate.for_departure_date_and_currency(
+              Date.parse(leg[:departure_date]),
+              leg[:rate_currency].downcase
+            )
+            rate / exchange_rate.rate
+          end
+        end
+
+        expect(total_cost_eur).to be < 500 # Should be reasonable cost
+      end
+
+      it 'chooses alternative 3-leg route when primary route becomes expensive' do
+        # Make the primary 4-leg route expensive by increasing LEG3 cost
+        Sailing.find_by(sailing_code: 'LEG3').rate.update!(
+          amount: Money.new(50000, 'EUR') # €500
+        )
+
+        result = strategy.find_route('CNSHA', 'USNYC')
+
+        # Should find alternative route via DEHAM
+        expect(result.size).to eq(3)
+        expect(result[0][:sailing_code]).to eq('LEG1') # CNSHA->ESBCN
+        expect(result[1][:sailing_code]).to eq('ALT2') # ESBCN->DEHAM
+        expect(result[2][:sailing_code]).to eq('ALT3') # DEHAM->USNYC
+      end
+
+      it 'maintains valid connection timing for 4-leg routes' do
+        result = strategy.find_route('CNSHA', 'USNYC')
+
+        result.each_cons(2) do |current, next_leg|
+          current_arrival = Date.parse(current[:arrival_date])
+          next_departure = Date.parse(next_leg[:departure_date])
+          expect(next_departure).to be >= current_arrival
+        end
+      end
+    end
+
     context 'WRT-0002: original problem scenario' do
       before do
         create_wrt_0002_original_data
@@ -339,6 +428,65 @@ RSpec.describe RouteStrategies::CheapestStrategy do
       sailing_code: 'ETRG'
     )
     Rate.create!(sailing: etrg, amount: Money.new(6996, 'USD'), currency: 'USD')
+  end
+
+  def create_three_plus_leg_data
+    # Add additional exchange rates for new dates
+    ExchangeRate.find_or_create_by!(departure_date: '2022-02-10', currency: 'usd') { |er| er.rate = 1.1400 }
+    ExchangeRate.find_or_create_by!(departure_date: '2022-02-20', currency: 'usd') { |er| er.rate = 1.1500 }
+    ExchangeRate.find_or_create_by!(departure_date: '2022-03-05', currency: 'usd') { |er| er.rate = 1.1600 }
+
+    # Create expensive direct route to force multi-leg preference
+    direct_expensive = Sailing.create!(
+      origin_port: 'CNSHA', destination_port: 'USNYC',
+      departure_date: '2022-01-30', arrival_date: '2022-03-15',
+      sailing_code: 'EXPENSIVE_DIRECT'
+    )
+    Rate.create!(sailing: direct_expensive, amount: Money.new(200000, 'EUR'), currency: 'EUR')
+
+    # 4-leg route: CNSHA->ESBCN->NLRTM->BRSSZ->USNYC
+    leg1 = Sailing.create!(
+      origin_port: 'CNSHA', destination_port: 'ESBCN',
+      departure_date: '2022-01-29', arrival_date: '2022-02-05',
+      sailing_code: 'LEG1'
+    )
+    Rate.create!(sailing: leg1, amount: Money.new(15000, 'EUR'), currency: 'EUR')
+
+    leg2 = Sailing.create!(
+      origin_port: 'ESBCN', destination_port: 'NLRTM',
+      departure_date: '2022-02-10', arrival_date: '2022-02-15',
+      sailing_code: 'LEG2'
+    )
+    Rate.create!(sailing: leg2, amount: Money.new(8000, 'USD'), currency: 'USD')
+
+    leg3 = Sailing.create!(
+      origin_port: 'NLRTM', destination_port: 'BRSSZ',
+      departure_date: '2022-02-20', arrival_date: '2022-03-01',
+      sailing_code: 'LEG3'
+    )
+    Rate.create!(sailing: leg3, amount: Money.new(12000, 'EUR'), currency: 'EUR')
+
+    leg4 = Sailing.create!(
+      origin_port: 'BRSSZ', destination_port: 'USNYC',
+      departure_date: '2022-03-05', arrival_date: '2022-03-12',
+      sailing_code: 'LEG4'
+    )
+    Rate.create!(sailing: leg4, amount: Money.new(9000, 'USD'), currency: 'USD')
+
+    # Alternative 3-leg route via DEHAM: CNSHA->ESBCN->DEHAM->USNYC
+    alt2 = Sailing.create!(
+      origin_port: 'ESBCN', destination_port: 'DEHAM',
+      departure_date: '2022-02-10', arrival_date: '2022-02-14',
+      sailing_code: 'ALT2'
+    )
+    Rate.create!(sailing: alt2, amount: Money.new(7000, 'EUR'), currency: 'EUR')
+
+    alt3 = Sailing.create!(
+      origin_port: 'DEHAM', destination_port: 'USNYC',
+      departure_date: '2022-02-18', arrival_date: '2022-02-25',
+      sailing_code: 'ALT3'
+    )
+    Rate.create!(sailing: alt3, amount: Money.new(25000, 'EUR'), currency: 'EUR')
   end
 
   def create_wrt_0002_original_data
