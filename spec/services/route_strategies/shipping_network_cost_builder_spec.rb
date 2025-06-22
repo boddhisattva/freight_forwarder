@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe RouteStrategies::CostGraphBuilder do
+RSpec.describe RouteStrategies::ShippingNetworkCostBuilder do
   subject(:builder) { described_class.new(currency_converter) }
   let(:currency_converter) { instance_double('CurrencyConverter') }
 
@@ -201,39 +201,21 @@ RSpec.describe RouteStrategies::CostGraphBuilder do
     end
   end
 
-  describe '#create_cost_edge (private method)' do
-    let(:sailing) { build_stubbed(:sailing,
-      origin_port: 'CNSHA',
-      destination_port: 'ESBCN',
-      departure_date: Date.parse('2022-01-29'),
-      arrival_date: Date.parse('2022-02-12')
-    ) }
+  describe 'inheritance' do
+    it 'inherits from ShippingNetworkBuilder' do
+      expect(described_class.superclass).to eq(RouteStrategies::ShippingNetworkBuilder)
+    end
 
-    let(:rate) { instance_double('Rate', amount: Money.new(26196, 'EUR')) }
-
-    before do
+    it 'implements the template method' do
+      sailing = build_stubbed(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM')
+      rate = instance_double('Rate', amount: Money.new(1000, 'EUR'))
       allow(sailing).to receive(:rate).and_return(rate)
-      allow(currency_converter).to receive(:convert_to_eur)
-        .with(Money.new(26196, 'EUR'), sailing.departure_date)
-        .and_return(Money.new(26196, 'EUR'))
-    end
+      allow(currency_converter).to receive(:convert_to_eur).and_return(Money.new(1000, 'EUR'))
 
-    it 'creates edge with all required fields' do
-      edge = builder.send(:create_cost_edge, sailing)
+      result = builder.build_from_sailings([ sailing ])
 
-      expect(edge).to include(
-        sailing: sailing,
-        destination: 'ESBCN',
-        cost_cents: 26196,
-        departure_date: sailing.departure_date,
-        arrival_date: sailing.arrival_date
-      )
-    end
-
-    it 'preserves sailing object reference' do
-      edge = builder.send(:create_cost_edge, sailing)
-
-      expect(edge[:sailing]).to be(sailing)
+      expect(result['CNSHA'].first).to include(:cost_cents)
+      expect(result['CNSHA'].first[:cost_cents]).to eq(1000)
     end
   end
 end
