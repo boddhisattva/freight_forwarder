@@ -2,16 +2,16 @@
 module RouteStrategies
   class CheapestStrategy < BaseStrategy
     def initialize(repository)
-      super(repository)
-      @graph_builder = RouteStrategies::CostGraphBuilder.new(@currency_converter)
-      @pathfinder = RouteStrategies::BellmanFordPathfinder.new
+      super
+      @shipping_network_builder = ShippingNetworkCostBuilder.new(@currency_converter)
+      @pathfinder = BellmanFordPathfinder.new
       @cost_calculator = CostCalculator.new
     end
 
     def find_route(origin, destination)
       relevant_sailings = load_relevant_sailings(origin, destination)
-      graph = @graph_builder.build_from_sailings(relevant_sailings)
-      path = @pathfinder.find_cheapest_path(graph, origin, destination, @cost_calculator)
+      shipping_network = @shipping_network_builder.build_from_sailings(relevant_sailings)
+      path = @pathfinder.find_cheapest_path(shipping_network, origin, destination, @cost_calculator)
 
       return [] if path.empty?
       format_route(path)

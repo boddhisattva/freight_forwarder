@@ -1,15 +1,15 @@
 module RouteStrategies
   class FastestStrategy < BaseStrategy
     def initialize(repository)
-      super(repository)
-      @graph_builder = ShippingGraphBuilder.new
+      super
+      @shipping_network_builder = ShippingNetworkDurationBuilder.new
       @pathfinder = DijkstraPathfinder.new
-      @journey_calculator = JourneyTimeCalculator.new
+      @time_calculator = JourneyTimeCalculator.new
     end
 
     def find_route(origin, destination)
-      graph = @graph_builder.build_from_sailings(load_relevant_sailings(origin, destination))
-      path = @pathfinder.find_shortest_path(graph, origin, destination, @journey_calculator)
+      shipping_network = @shipping_network_builder.build_from_sailings(load_relevant_sailings(origin, destination))
+      path = @pathfinder.find_shortest_path(shipping_network, origin, destination, @time_calculator)
 
       return [] if path.empty?
       format_route(path)
