@@ -1,4 +1,10 @@
 class RouteFinderService
+  STRATEGY_MAP = {
+    "cheapest-direct" => RouteStrategies::CheapestDirectStrategy,
+    "cheapest" => RouteStrategies::CheapestStrategy,
+    "fastest" => RouteStrategies::FastestStrategy
+  }.freeze
+
   def initialize(data_repository: DataRepository.new)
     @repository = data_repository
   end
@@ -10,12 +16,11 @@ class RouteFinderService
 
   private
 
-  def strategy_for(criteria) # TODO: Refactor this to a hash later on when more strategies are added
-    case criteria
-    when "cheapest-direct"
-      RouteStrategies::CheapestDirectStrategy.new(@repository)
-    when "cheapest"
-      RouteStrategies::CheapestStrategy.new(@repository)
+  def strategy_for(criteria)
+    strategy_class = STRATEGY_MAP[criteria]
+
+    if strategy_class
+      strategy_class.new(@repository)
     else
       raise ArgumentError, "Unknown criteria: #{criteria}"
     end

@@ -17,7 +17,7 @@
 FactoryBot.define do
   factory :exchange_rate do
     departure_date { "2025-06-20 16:59:17" }
-    currency { "MyString" }
+    currency { "USD" }
     rate { "9.99" }
   end
 end

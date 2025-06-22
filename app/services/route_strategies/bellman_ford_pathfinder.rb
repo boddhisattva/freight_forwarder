@@ -40,7 +40,6 @@ module RouteStrategies
     end
 
     def find_optimal_shipping_routes(shipping_routes, state, cost_calculator)
-      # Bellman-Ford: Relax edges N-1 times
       (state[:all_shipping_ports].length - 1).times do |round|
         updated = false
 

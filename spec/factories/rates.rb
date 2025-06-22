@@ -21,6 +21,6 @@ FactoryBot.define do
   factory :rate do
     sailing { create(:sailing) }
     amount_cents { 1 }
-    currency { "MyString" }
+    currency { "USD" }
   end
 end
