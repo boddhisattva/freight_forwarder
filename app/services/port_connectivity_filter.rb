@@ -9,7 +9,7 @@
 # Phase 4: Find Relevant Ports by intersection of forward_reachable and backward_reachable ports
 # Phase 5: Load Filtered Sailings
 class PortConnectivityFilter
-  MAX_HOPS = 4 # Reasonable limit for shipping routes
+  MAX_HOPS = 4 # Reasonable limit for shipping routes TODO: Make this configurable
 
   def initialize(max_hops: MAX_HOPS)
     @max_hops = max_hops
