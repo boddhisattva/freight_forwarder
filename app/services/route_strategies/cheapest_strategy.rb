@@ -1,8 +1,9 @@
+# app/services/route_strategies/cheapest_strategy.rb
 module RouteStrategies
   class CheapestStrategy < BaseStrategy
     def initialize(repository)
       super(repository)
-      @graph_builder = RouteStrategies::CostGraphBuilder.new
+      @graph_builder = RouteStrategies::CostGraphBuilder.new(@currency_converter)
       @pathfinder = RouteStrategies::BellmanFordPathfinder.new
       @cost_calculator = CostCalculator.new
     end
