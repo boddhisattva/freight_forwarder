@@ -66,7 +66,7 @@ class PortConnectivityFilter
 
   def breadth_first_search_forward(start_port)
     visited_ports = Set.new
-    ports_to_explore = [start_port]
+    ports_to_explore = [ start_port ]
     current_hop = 0
 
     while current_hop < @max_hops && ports_to_explore.any?
@@ -101,7 +101,7 @@ class PortConnectivityFilter
 
   def breadth_first_search_backward(end_port)
     visited_ports = Set.new
-    ports_to_explore = [end_port]
+    ports_to_explore = [ end_port ]
     current_hop = 0
 
     while current_hop < @max_hops && ports_to_explore.any?

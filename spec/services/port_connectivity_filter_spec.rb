@@ -192,7 +192,7 @@ RSpec.describe PortConnectivityFilter do
       it 'removes duplicate destinations' do
         map = filter.send(:build_port_connectivity_map)
 
-        expect(map['A']).to eq(['B', 'C']) # B appears only once despite multiple sailings
+        expect(map['A']).to eq([ 'B', 'C' ]) # B appears only once despite multiple sailings
       end
     end
 
@@ -258,7 +258,7 @@ RSpec.describe PortConnectivityFilter do
       end
 
       it 'loads sailings for relevant ports only' do
-        sailings = filter.send(:load_sailings_for_ports, ['A', 'B', 'C'])
+        sailings = filter.send(:load_sailings_for_ports, [ 'A', 'B', 'C' ])
 
         sailing_codes = sailings.pluck(:sailing_code)
         expect(sailing_codes).to contain_exactly('AB', 'BC')
@@ -266,7 +266,7 @@ RSpec.describe PortConnectivityFilter do
       end
 
       it 'includes rate associations' do
-        sailings = filter.send(:load_sailings_for_ports, ['A', 'B'])
+        sailings = filter.send(:load_sailings_for_ports, [ 'A', 'B' ])
 
         expect(sailings.first.association(:rate).loaded?).to be true
       end
