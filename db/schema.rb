@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_06_20_145917) do
+ActiveRecord::Schema[8.0].define(version: 2025_06_23_013422) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -42,6 +42,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_20_145917) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["origin_port", "destination_port"], name: "index_sailings_on_origin_port_and_destination_port"
+    t.index ["sailing_code"], name: "index_sailings_on_sailing_code"
   end
 
   add_foreign_key "rates", "sailings"

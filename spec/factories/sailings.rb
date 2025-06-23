@@ -14,6 +14,7 @@
 # Indexes
 #
 #  index_sailings_on_origin_port_and_destination_port  (origin_port,destination_port)
+#  index_sailings_on_sailing_code                      (sailing_code)
 #
 FactoryBot.define do
   factory :sailing do
