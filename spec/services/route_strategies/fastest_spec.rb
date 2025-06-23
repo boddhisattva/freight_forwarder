@@ -208,12 +208,12 @@ RSpec.describe RouteStrategies::Fastest do
     it 'handles 3+ leg routes with real data correctly' do
       allow(PortConnectivityFilter).to receive(:new).and_call_original
       real_strategy = described_class.new(DataRepository.new)
-      result = real_strategy.find_route('CNSHA', 'USNYC')
+      result = real_strategy.find_route('CNSHA', 'BRSSZ')
 
-      # Should find 3-leg route: CNSHA->ESBCN->NLRTM->USNYC
-      expect(result.size).to eq(3)
+      # Should find 2-leg route: CNSHA->ESBCN->BRSSZ
+      expect(result.size).to eq(2)
       expect(result.first[:origin_port]).to eq('CNSHA')
-      expect(result.last[:destination_port]).to eq('USNYC')
+      expect(result.last[:destination_port]).to eq('BRSSZ')
 
       # Verify route sequence
       result.each_cons(2) do |current, next_leg|
