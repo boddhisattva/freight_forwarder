@@ -97,8 +97,10 @@ ruby bin/freight_finder.rb
 
 ## Design considerations: To Update(Kindly allow me some time to update this please)
 * Bellman Ford Algorithm allows to take discounts etc., & hence it's better suited than Depth First Search for finding Cheapest Route
-* Reachability Pruning used to get the Sailings Reachable
+* Adherance to SOLID principles for more object oriented code
+
 
 ## Performance considerations: To Update(Kindly allow me some time to update this please)
-* build_stubbed are used at various places for faster specs
+* Reachability Pruning(via `PortConnectivityFilter`) used to get required Sailings based on origin & destination port instead of having to load all Sailings
+* `build_stubbed` is used at various places for faster specs
 * Indexes have also been added for faster DB lookups
