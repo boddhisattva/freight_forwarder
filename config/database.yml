@@ -3,8 +3,8 @@ default: &default
   encoding: unicode
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
   host: <%= ENV.fetch("DATABASE_HOST") { "localhost" } %>
-  username: <%= ENV.fetch("DATABASE_USER") { "freight_user" } if Rails.env.production? %>
-  password: <%= ENV.fetch("DATABASE_PASSWORD") { "freight_password" } if Rails.env.production? %>
+  username: <%= ENV.fetch("DATABASE_USER") { "freight_user" }  %>
+  password: <%= ENV.fetch("DATABASE_PASSWORD") { "freight_password" }  %>
 
 development:
   <<: *default

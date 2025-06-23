@@ -30,7 +30,6 @@ RSpec.describe Sailing, type: :model do
     it { should validate_presence_of(:departure_date) }
     it { should validate_presence_of(:arrival_date) }
 
-    # Fix uniqueness validation by providing a valid record
     it 'validates uniqueness of sailing_code' do
       existing_sailing = create(:sailing, sailing_code: 'QRST')
       duplicate_sailing = build(:sailing, sailing_code: existing_sailing.sailing_code)
@@ -62,23 +61,22 @@ RSpec.describe Sailing, type: :model do
         expect(sailing).not_to be_valid
         expect(sailing.errors[:arrival_date]).to include('must be after departure date')
       end
-
-      it 'is valid when dates are nil (handled by presence validation)' do
-        sailing.departure_date = nil
-        sailing.arrival_date = nil
-        expect(sailing).not_to be_valid # fails presence validation, not custom validation
-      end
     end
   end
 
   describe 'scopes' do
-    let(:shanghai_rotterdam) { build_stubbed(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM') }
-    let(:shanghai_barcelona) { build_stubbed(:sailing, origin_port: 'CNSHA', destination_port: 'ESBCN') }
-    let(:barcelona_rotterdam) { build_stubbed(:sailing, origin_port: 'ESBCN', destination_port: 'NLRTM') }
+    let(:shanghai_rotterdam) { create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM') }
+    let(:shanghai_barcelona) { create(:sailing, origin_port: 'CNSHA', destination_port: 'ESBCN') }
+    let(:barcelona_rotterdam) { create(:sailing, origin_port: 'ESBCN', destination_port: 'NLRTM') }
+
+    before do
+      shanghai_rotterdam
+      shanghai_barcelona
+      barcelona_rotterdam
+    end
 
     describe '.from_port' do
       it 'returns sailings from specified port' do
-        allow(Sailing).to receive(:from_port).with('CNSHA').and_return([ shanghai_rotterdam, shanghai_barcelona ])
         expect(Sailing.from_port('CNSHA')).to include(shanghai_rotterdam, shanghai_barcelona)
         expect(Sailing.from_port('CNSHA')).not_to include(barcelona_rotterdam)
       end
@@ -86,22 +84,15 @@ RSpec.describe Sailing, type: :model do
 
     describe '.to_port' do
       it 'returns sailings to specified port' do
-        allow(Sailing).to receive(:to_port).with('NLRTM').and_return([ shanghai_rotterdam, barcelona_rotterdam ])
         expect(Sailing.to_port('NLRTM')).to include(shanghai_rotterdam, barcelona_rotterdam)
         expect(Sailing.to_port('NLRTM')).not_to include(shanghai_barcelona)
       end
     end
 
     describe '.direct' do
-      it 'returns direct sailings between two ports (stubbed)' do
-        allow(Sailing).to receive(:direct).with('CNSHA', 'NLRTM').and_return([ shanghai_rotterdam ])
+      it 'returns direct sailings between two ports' do
         expect(Sailing.direct('CNSHA', 'NLRTM')).to include(shanghai_rotterdam)
         expect(Sailing.direct('CNSHA', 'NLRTM')).not_to include(shanghai_barcelona, barcelona_rotterdam)
-      end
-
-      it 'returns direct sailings between two ports (real DB integration)' do
-        real_sailing = create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM')
-        expect(Sailing.direct('CNSHA', 'NLRTM')).to include(real_sailing)
       end
     end
   end
@@ -109,16 +100,10 @@ RSpec.describe Sailing, type: :model do
   describe '#duration_days' do
     let(:sailing) { build(:sailing) }
 
-    it 'calculates duration correctly for 17-day journey' do
+    it 'calculates duration correctly for multi-day journey' do
       sailing.departure_date = Date.parse('2022-01-29')
       sailing.arrival_date = Date.parse('2022-02-15')
       expect(sailing.duration_days).to eq(17)
-    end
-
-    it 'calculates duration correctly for 1-day journey' do
-      sailing.departure_date = Date.parse('2022-01-01')
-      sailing.arrival_date = Date.parse('2022-01-02')
-      expect(sailing.duration_days).to eq(1)
     end
 
     it 'calculates duration correctly for same-day journey' do

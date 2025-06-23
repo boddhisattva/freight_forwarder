@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: freight_forwarder_test
+      POSTGRES_USER: freight_user
+      POSTGRES_PASSWORD: freight_password
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U freight_user -d freight_forwarder_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  test:
+    build: .
+    environment:
+      DATABASE_HOST: db
+      DATABASE_USER: freight_user
+      DATABASE_PASSWORD: freight_password
+      DATABASE_NAME: freight_forwarder_test
+      RAILS_ENV: test
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: bundle exec rspec
+    profiles:
+      - test
+
+volumes:
+  postgres_test_data:

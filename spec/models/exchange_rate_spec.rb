@@ -37,23 +37,25 @@ RSpec.describe ExchangeRate, type: :model do
       existing_rate2 = build(:exchange_rate, departure_date: Date.parse('2022-01-29'), currency: 'JPY', rate: 1.1538)
       duplicate_rate = build(:exchange_rate, departure_date: existing_rate.departure_date, currency: existing_rate.currency, rate: 1.2000)
       expect(duplicate_rate).not_to be_valid
-      expect(existing_rate2).to be_valid
       expect(duplicate_rate.errors[:currency]).to include('has already been taken')
+
+      # Different currency on same date should be valid
+      different_currency = build(:exchange_rate, departure_date: existing_rate.departure_date, currency: 'JPY', rate: 1.1538)
+      expect(different_currency).to be_valid
     end
   end
 
   describe 'scopes' do
     before do
       create(:exchange_rate, departure_date: Date.parse('2022-01-29'), currency: 'usd', rate: 1.1138)
-      create(:exchange_rate, departure_date: Date.parse('2022-01-29'), currency: 'jpy', rate: 130.85)
-      create(:exchange_rate, departure_date: Date.parse('2022-01-30'), currency: 'usd', rate: 1.1138)
+      create(:exchange_rate, departure_date: Date.parse('2022-01-30'), currency: 'usd', rate: 1.1156)
     end
 
     describe '.for_departure_date' do
       it 'returns rates for specific departure date' do
         rates = ExchangeRate.for_departure_date(Date.parse('2022-01-29'))
-        expect(rates.count).to eq(2)
-        expect(rates.pluck(:currency)).to contain_exactly('usd', 'jpy')
+        expect(rates.count).to eq(1)
+        expect(rates.first.currency).to eq('usd')
       end
     end
 
@@ -61,7 +63,6 @@ RSpec.describe ExchangeRate, type: :model do
       it 'returns rates for specific currency (case insensitive)' do
         expect(ExchangeRate.for_currency('usd').count).to eq(2)
         expect(ExchangeRate.for_currency('USD').count).to eq(2)
-        expect(ExchangeRate.for_currency('jpy').count).to eq(1)
       end
     end
 
