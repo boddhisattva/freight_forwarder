@@ -1,3 +1,12 @@
+# Bellman-Ford Pathfinder
+#
+# This class finds the cheapest path between two ports using Bellman-Ford's algorithm.
+#
+# Algorithm(Bellman-Ford's algorithm) overview:
+# Phase 1: Network Setup(Set up the shipping network)
+# Phase 2: Explore Shipping Routes by Cost Priority
+# Phase 3: Reconstruct Shipping Route to find the cheapest path
+
 module RouteStrategies
   class BellmanFordPathfinder
     INFINITY = Float::INFINITY
