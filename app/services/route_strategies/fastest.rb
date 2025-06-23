@@ -1,5 +1,5 @@
 module RouteStrategies
-  class FastestStrategy < BaseStrategy
+  class Fastest < Base
     def initialize(repository)
       super
       @shipping_network_builder = ShippingNetworkDurationBuilder.new
