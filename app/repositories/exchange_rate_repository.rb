@@ -9,7 +9,7 @@ class ExchangeRateRepository
 
   def create_rates_for_date(date, currencies)
     currencies.each do |currency, rate|
-      ExchangeRate.find_or_create_by(
+      ExchangeRate.find_or_create_by!(
         departure_date: Date.parse(date),
         currency: currency
       ) do |exchange_rate|
