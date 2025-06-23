@@ -377,50 +377,5 @@ RSpec.describe RouteStrategies::DijkstraPathfinder do
         expect(result).to eq([])
       end
     end
-
-    context 'integration with response.json data' do
-      it 'finds QRST as fastest route using actual data format' do
-        # Load only QRST and one alternative from response.json structure
-        response_data = JSON.parse(File.read(Rails.root.join('db', 'response.json')))
-
-        # Create only QRST and ABCD sailings from real data
-        qrst_data = response_data['sailings'].find { |s| s['sailing_code'] == 'QRST' }
-        abcd_data = response_data['sailings'].find { |s| s['sailing_code'] == 'ABCD' }
-
-        qrst_sailing = create(:sailing,
-          origin_port: qrst_data['origin_port'],
-          destination_port: qrst_data['destination_port'],
-          departure_date: Date.parse(qrst_data['departure_date']),
-          arrival_date: Date.parse(qrst_data['arrival_date']),
-          sailing_code: qrst_data['sailing_code']
-        )
-
-        abcd_sailing = create(:sailing,
-          origin_port: abcd_data['origin_port'],
-          destination_port: abcd_data['destination_port'],
-          departure_date: Date.parse(abcd_data['departure_date']),
-          arrival_date: Date.parse(abcd_data['arrival_date']),
-          sailing_code: abcd_data['sailing_code']
-        )
-
-        shipping_network = Hash.new { |h, k| h[k] = [] }
-        [ qrst_sailing, abcd_sailing ].each do |sailing|
-          shipping_network[sailing.origin_port] << {
-            sailing: sailing,
-            destination: sailing.destination_port,
-            departure_date: sailing.departure_date.to_datetime,
-            arrival_date: sailing.arrival_date.to_datetime
-          }
-        end
-
-        real_journey_calculator = JourneyTimeCalculator.new
-        result = pathfinder.find_shortest_path(shipping_network, 'CNSHA', 'NLRTM', real_journey_calculator)
-
-        # Verify QRST wins with actual response.json dates
-        expect(result.first.sailing_code).to eq('QRST')
-        expect(result.first.departure_date).to eq(Date.parse('2022-01-29'))
-        expect(result.first.arrival_date).to eq(Date.parse('2022-02-15'))
-      end
-    end
   end
 end

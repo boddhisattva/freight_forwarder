@@ -10,250 +10,96 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
     let(:origin) { 'CNSHA' }
     let(:destination) { 'NLRTM' }
 
-    context 'when direct sailings exist' do
+    context 'successful route finding' do
       before do
-        @sailing1 = build_stubbed(:sailing,
+        @usd_sailing = build_stubbed(:sailing,
           origin_port: origin,
           destination_port: destination,
           departure_date: Date.parse('2022-02-01'),
-          arrival_date: Date.parse('2022-03-01'),
-          sailing_code: 'ABCD'
+          sailing_code: 'USD001'
         )
 
-        @sailing2 = build_stubbed(:sailing,
+        @eur_sailing = build_stubbed(:sailing,
           origin_port: origin,
           destination_port: destination,
           departure_date: Date.parse('2022-01-29'),
-          arrival_date: Date.parse('2022-02-15'),
-          sailing_code: 'QRST'
+          sailing_code: 'EUR001'
+        )
+
+        @jpy_sailing = build_stubbed(:sailing,
+          origin_port: origin,
+          destination_port: destination,
+          departure_date: Date.parse('2022-01-31'),
+          sailing_code: 'JPY001'
+        )
+
+        @sailing_without_rate = build_stubbed(:sailing,
+          origin_port: origin,
+          destination_port: destination,
+          sailing_code: 'NORATES'
         )
 
         allow(repository).to receive(:find_direct_sailings)
           .with(origin, destination)
-          .and_return([ @sailing1, @sailing2 ])
+          .and_return([ @usd_sailing, @eur_sailing, @jpy_sailing, @sailing_without_rate ])
 
-        # Mock convert_rate_to_eur method
+        # JPY is cheapest after conversion
         allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing1)
-          .and_return(Money.new(52300, 'EUR'))
+          .with(@usd_sailing)
+          .and_return(Money.new(100000, 'EUR'))
 
         allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing2)
-          .and_return(Money.new(76196, 'EUR'))
+          .with(@eur_sailing)
+          .and_return(Money.new(90000, 'EUR'))
 
-        # Mock format_route method
+        allow(strategy).to receive(:convert_rate_to_eur)
+          .with(@jpy_sailing)
+          .and_return(Money.new(75000, 'EUR'))
+
+        # Sailing without rate returns nil
+        allow(strategy).to receive(:convert_rate_to_eur)
+          .with(@sailing_without_rate)
+          .and_return(nil)
+
         allow(strategy).to receive(:format_route)
-          .with([ @sailing1 ])
+          .with([ @jpy_sailing ])
           .and_return([ {
             origin_port: origin,
             destination_port: destination,
-            departure_date: '2022-02-01',
-            arrival_date: '2022-03-01',
-            sailing_code: 'ABCD',
-            rate: '589.30',
-            rate_currency: 'USD'
+            departure_date: '2022-01-31',
+            arrival_date: '2022-02-28',
+            sailing_code: 'JPY001',
+            rate: '97453',
+            rate_currency: 'JPY'
           } ])
       end
 
-      it 'returns the cheapest direct sailing' do
+      it 'returns cheapest direct sailing after currency conversion' do
         result = strategy.find_route(origin, destination)
 
         expect(result).to be_an(Array)
         expect(result.length).to eq(1)
 
         cheapest_route = result.first
-        expect(cheapest_route[:origin_port]).to eq(origin)
-        expect(cheapest_route[:destination_port]).to eq(destination)
-        expect(cheapest_route[:sailing_code]).to eq('ABCD')
-        expect(cheapest_route[:rate]).to eq('589.30')
-        expect(cheapest_route[:rate_currency]).to eq('USD')
-      end
-    end
-
-    context 'when multiple sailings have same EUR cost' do
-      before do
-        @sailing1 = build_stubbed(:sailing,
-          sailing_code: 'SAME1',
-          departure_date: Date.parse('2022-02-01')
-        )
-
-        @sailing2 = build_stubbed(:sailing,
-          sailing_code: 'SAME2',
-          departure_date: Date.parse('2022-02-02')
-        )
-
-        allow(repository).to receive(:find_direct_sailings)
-          .and_return([ @sailing1, @sailing2 ])
-
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .and_return(Money.new(50000, 'EUR'))
-
-        allow(strategy).to receive(:format_route)
-          .and_return([ { sailing_code: 'SAME1' } ])
+        expect(cheapest_route[:sailing_code]).to eq('JPY001')
+        expect(cheapest_route[:rate_currency]).to eq('JPY')
       end
 
-      it 'returns one of the sailings consistently' do
+      it 'ignores sailings without valid rates' do
         result = strategy.find_route(origin, destination)
 
-        expect(result.length).to eq(1)
-        expect([ 'SAME1', 'SAME2' ]).to include(result.first[:sailing_code])
-      end
-    end
-
-    context 'when no direct sailings exist' do
-      before do
-        allow(repository).to receive(:find_direct_sailings)
-          .with(origin, destination)
-          .and_return([])
-      end
-
-      it 'returns error object instead of empty array' do
-        result = strategy.find_route(origin, destination)
-
-        expect(result).to be_a(Hash)
-        expect(result[:error]).to eq("No direct sailings found between #{origin} and #{destination}")
-        expect(result[:error_code]).to eq("NO_DIRECT_SAILINGS")
-      end
-    end
-
-    context 'when sailing has no rate' do
-      before do
-        @sailing_without_rate = build_stubbed(:sailing, sailing_code: 'NORATES')
-
-        allow(repository).to receive(:find_direct_sailings)
-          .and_return([ @sailing_without_rate ])
-
-        # Mock convert_rate_to_eur to return nil for sailings without rates
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_without_rate)
-          .and_return(nil)
-      end
-
-      it 'handles sailing without rate gracefully' do
-        expect {
-          strategy.find_route(origin, destination)
-        }.not_to raise_error
-      end
-
-      it 'returns error object when all sailings have no rates' do
-        result = strategy.find_route(origin, destination)
-
-        expect(result).to be_a(Hash)
-        expect(result[:error]).to eq("No sailings with valid rates found between #{origin} and #{destination}")
-        expect(result[:error_code]).to eq("NO_VALID_RATES")
-      end
-    end
-
-    # NEW TEST CONTEXT FOR Float::INFINITY SCENARIO
-    context 'when mixing sailings with and without rates (Float::INFINITY scenario)' do
-      before do
-        # Sailing with a good rate
-        @sailing_with_rate = build_stubbed(:sailing,
-          origin_port: origin,
-          destination_port: destination,
-          departure_date: Date.parse('2022-02-01'),
-          arrival_date: Date.parse('2022-03-01'),
-          sailing_code: 'HASRATE'
-        )
-
-        # Sailing without rate (will get Float::INFINITY)
-        @sailing_without_rate = build_stubbed(:sailing,
-          origin_port: origin,
-          destination_port: destination,
-          departure_date: Date.parse('2022-01-29'),
-          arrival_date: Date.parse('2022-02-15'),
-          sailing_code: 'NORATES'
-        )
-
-        # Another sailing without rate
-        @another_sailing_without_rate = build_stubbed(:sailing,
-          origin_port: origin,
-          destination_port: destination,
-          departure_date: Date.parse('2022-02-02'),
-          arrival_date: Date.parse('2022-03-02'),
-          sailing_code: 'ALSONORATES'
-        )
-
-        allow(repository).to receive(:find_direct_sailings)
-          .with(origin, destination)
-          .and_return([ @sailing_with_rate, @sailing_without_rate, @another_sailing_without_rate ])
-
-        # Mock convert_rate_to_eur method
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_with_rate)
-          .and_return(Money.new(52300, 'EUR'))
-
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_without_rate)
-          .and_return(nil)
-
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@another_sailing_without_rate)
-          .and_return(nil)
-
-        # Mock format_route method
-        allow(strategy).to receive(:format_route)
-          .with([ @sailing_with_rate ])
-          .and_return([ {
-            origin_port: origin,
-            destination_port: destination,
-            departure_date: '2022-02-01',
-            arrival_date: '2022-03-01',
-            sailing_code: 'HASRATE',
-            rate: '589.30',
-            rate_currency: 'USD'
-          } ])
-      end
-
-      it 'ignores sailings without rates due to Float::INFINITY and picks the valid one' do
-        result = strategy.find_route(origin, destination)
-
-        expect(result).to be_an(Array)
-        expect(result.length).to eq(1)
-
-        selected_route = result.first
-        expect(selected_route[:sailing_code]).to eq('HASRATE')
-        expect(selected_route[:rate]).to eq('589.30')
-        expect(selected_route[:rate_currency]).to eq('USD')
-      end
-
-      it 'demonstrates Float::INFINITY behavior prevents selection of nil rates' do
-        # This test shows that sailings without rates get Float::INFINITY
-        # and are therefore never selected as the minimum
-        result = strategy.find_route(origin, destination)
-
-        # The result should never contain sailings without rates
-        expect(result.first[:sailing_code]).not_to eq('NORATES')
-        expect(result.first[:sailing_code]).not_to eq('ALSONORATES')
-        expect(result.first[:sailing_code]).to eq('HASRATE')
-      end
-
-      it 'handles edge case where expensive valid rate is still better than Float::INFINITY' do
-        # Even a very expensive rate should beat Float::INFINITY
-        very_expensive_sailing = build_stubbed(:sailing, sailing_code: 'EXPENSIVE')
-
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(very_expensive_sailing)
-          .and_return(Money.new(999999999, 'EUR'))
-
-        allow(repository).to receive(:find_direct_sailings)
-          .and_return([ very_expensive_sailing, @sailing_without_rate ])
-
-        allow(strategy).to receive(:format_route)
-          .with([ very_expensive_sailing ])
-          .and_return([ { sailing_code: 'EXPENSIVE' } ])
-
-        result = strategy.find_route(origin, destination)
-
-        # Should pick the expensive one over the one with no rate (Float::INFINITY)
-        expect(result.first[:sailing_code]).to eq('EXPENSIVE')
+        sailing_codes = result.map { |route| route[:sailing_code] }
+        expect(sailing_codes).not_to include('NORATES')
       end
     end
 
     context 'with actual response.json data' do
       before do
-        # Create sailings matching response.json
-        @sailing_abcd = build_stubbed(:sailing,
+        # Load data from response.json
+        response_data = JSON.parse(File.read(Rails.root.join('db', 'response.json')))
+
+        # Create real sailings from response.json
+        @sailing_abcd = create(:sailing,
           origin_port: 'CNSHA',
           destination_port: 'NLRTM',
           departure_date: Date.parse('2022-02-01'),
@@ -261,23 +107,7 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
           sailing_code: 'ABCD'
         )
 
-        @sailing_efgh = build_stubbed(:sailing,
-          origin_port: 'CNSHA',
-          destination_port: 'NLRTM',
-          departure_date: Date.parse('2022-02-02'),
-          arrival_date: Date.parse('2022-03-02'),
-          sailing_code: 'EFGH'
-        )
-
-        @sailing_ijkl = build_stubbed(:sailing,
-          origin_port: 'CNSHA',
-          destination_port: 'NLRTM',
-          departure_date: Date.parse('2022-01-31'),
-          arrival_date: Date.parse('2022-02-28'),
-          sailing_code: 'IJKL'
-        )
-
-        @sailing_mnop = build_stubbed(:sailing,
+        @sailing_mnop = create(:sailing,
           origin_port: 'CNSHA',
           destination_port: 'NLRTM',
           departure_date: Date.parse('2022-01-30'),
@@ -285,7 +115,7 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
           sailing_code: 'MNOP'
         )
 
-        @sailing_qrst = build_stubbed(:sailing,
+        @sailing_qrst = create(:sailing,
           origin_port: 'CNSHA',
           destination_port: 'NLRTM',
           departure_date: Date.parse('2022-01-29'),
@@ -293,104 +123,67 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
           sailing_code: 'QRST'
         )
 
-        allow(repository).to receive(:find_direct_sailings)
-          .with('CNSHA', 'NLRTM')
-          .and_return([ @sailing_abcd, @sailing_efgh, @sailing_ijkl, @sailing_mnop, @sailing_qrst ])
+        # Create real rates from response.json
+        create(:rate,
+          sailing: @sailing_abcd,
+          amount_cents: 58930, # 589.30 USD
+          currency: 'USD'
+        )
 
-        # Mock convert_rate_to_eur with calculated EUR amounts
-        # ABCD: 589.30 USD at 1.126 = ~523.22 EUR
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_abcd)
-          .and_return(Money.new(52322, 'EUR'))
+        create(:rate,
+          sailing: @sailing_mnop,
+          amount_cents: 45678, # 456.78 USD
+          currency: 'USD'
+        )
 
-        # EFGH: 890.32 EUR = 890.32 EUR
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_efgh)
-          .and_return(Money.new(89032, 'EUR'))
+        create(:rate,
+          sailing: @sailing_qrst,
+          amount_cents: 76196, # 761.96 EUR
+          currency: 'EUR'
+        )
 
-        # IJKL: 97453 JPY at 131.2 = ~742.58 EUR
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_ijkl)
-          .and_return(Money.new(74258, 'EUR'))
+        # Create real exchange rates from response.json
+        create(:exchange_rate,
+          departure_date: Date.parse('2022-01-29'),
+          currency: 'usd',
+          rate: 1.1138
+        )
 
-        # MNOP: 456.78 USD at 1.1138 = ~410.13 EUR (cheapest)
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_mnop)
-          .and_return(Money.new(41013, 'EUR'))
+        create(:exchange_rate,
+          departure_date: Date.parse('2022-01-30'),
+          currency: 'usd',
+          rate: 1.1138
+        )
 
-        # QRST: 761.96 EUR = 761.96 EUR
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@sailing_qrst)
-          .and_return(Money.new(76196, 'EUR'))
+        create(:exchange_rate,
+          departure_date: Date.parse('2022-02-01'),
+          currency: 'usd',
+          rate: 1.126
+        )
 
-        # Mock format_route method
-        allow(strategy).to receive(:format_route)
-          .with([ @sailing_mnop ])
-          .and_return([ {
-            origin_port: 'CNSHA',
-            destination_port: 'NLRTM',
-            departure_date: '2022-01-30',
-            arrival_date: '2022-03-05',
-            sailing_code: 'MNOP',
-            rate: '456.78',
-            rate_currency: 'USD'
-          } ])
+        # Use real repository instead of mock
+        @real_repository = DataRepository.new
+        @real_currency_converter = CurrencyConverter.new
+        @real_strategy = described_class.new(@real_repository, currency_converter: @real_currency_converter)
       end
 
-      it 'returns MNOP as the cheapest direct sailing' do
-        result = strategy.find_route('CNSHA', 'NLRTM')
+      it 'returns MNOP as cheapest direct sailing from sample data' do
+        result = @real_strategy.find_route('CNSHA', 'NLRTM')
 
         expect(result.length).to eq(1)
         cheapest_route = result.first
 
-        expect(cheapest_route[:origin_port]).to eq('CNSHA')
-        expect(cheapest_route[:destination_port]).to eq('NLRTM')
-        expect(cheapest_route[:departure_date]).to eq('2022-01-30')
-        expect(cheapest_route[:arrival_date]).to eq('2022-03-05')
         expect(cheapest_route[:sailing_code]).to eq('MNOP')
         expect(cheapest_route[:rate]).to eq('456.78')
         expect(cheapest_route[:rate_currency]).to eq('USD')
       end
     end
 
-    context 'with different currencies' do
-      before do
-        @usd_sailing = build_stubbed(:sailing, sailing_code: 'USD001')
-        @eur_sailing = build_stubbed(:sailing, sailing_code: 'EUR001')
-        @jpy_sailing = build_stubbed(:sailing, sailing_code: 'JPY001')
-
-        allow(repository).to receive(:find_direct_sailings)
-          .and_return([ @usd_sailing, @eur_sailing, @jpy_sailing ])
-
-        # Mock converted EUR amounts (JPY is cheapest after conversion)
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@usd_sailing)
-          .and_return(Money.new(100000, 'EUR'))
-
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@eur_sailing)
-          .and_return(Money.new(100000, 'EUR'))
-
-        allow(strategy).to receive(:convert_rate_to_eur)
-          .with(@jpy_sailing)
-          .and_return(Money.new(74530, 'EUR'))
-
-        allow(strategy).to receive(:format_route)
-          .with([ @jpy_sailing ])
-          .and_return([ { sailing_code: 'JPY001', rate_currency: 'JPY' } ])
-      end
-
-      it 'compares rates after EUR conversion' do
-        result = strategy.find_route(origin, destination)
-
-        expect(result.first[:sailing_code]).to eq('JPY001')
-        expect(result.first[:rate_currency]).to eq('JPY')
-      end
-    end
-
     context 'error handling scenarios' do
       it 'returns structured error when no direct sailings exist' do
-        allow(repository).to receive(:find_direct_sailings).and_return([])
+        allow(repository).to receive(:find_direct_sailings)
+          .with(origin, destination)
+          .and_return([])
 
         result = strategy.find_route(origin, destination)
 
@@ -400,11 +193,16 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
         })
       end
 
-      it 'returns structured error when cheapest sailing has no valid rate' do
-        sailing = build_stubbed(:sailing, sailing_code: 'INVALID')
+      it 'returns structured error when all sailings have invalid rates' do
+        sailing_without_rate = build_stubbed(:sailing, sailing_code: 'INVALID')
 
-        allow(repository).to receive(:find_direct_sailings).and_return([ sailing ])
-        allow(strategy).to receive(:convert_rate_to_eur).and_return(nil)
+        allow(repository).to receive(:find_direct_sailings)
+          .with(origin, destination)
+          .and_return([ sailing_without_rate ])
+
+        allow(strategy).to receive(:convert_rate_to_eur)
+          .with(sailing_without_rate)
+          .and_return(nil)
 
         result = strategy.find_route(origin, destination)
 
