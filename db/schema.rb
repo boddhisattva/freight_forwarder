@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_06_23_013422) do
+ActiveRecord::Schema[8.0].define(version: 2025_06_23_021726) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -22,6 +22,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_23_013422) do
     t.datetime "updated_at", null: false
     t.index ["departure_date", "currency"], name: "index_exchange_rates_on_departure_date_and_currency", unique: true
     t.index ["departure_date"], name: "index_exchange_rates_on_departure_date"
+    t.check_constraint "rate > 0::numeric", name: "exchange_rates_rate_positive"
   end
 
   create_table "rates", force: :cascade do |t|
@@ -31,6 +32,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_23_013422) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["sailing_id"], name: "index_rates_on_sailing_id", unique: true
+    t.check_constraint "amount_cents > 0", name: "rates_amount_cents_positive"
   end
 
   create_table "sailings", force: :cascade do |t|
