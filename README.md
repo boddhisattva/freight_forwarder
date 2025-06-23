@@ -12,7 +12,7 @@ One can find the detailed problem statement [here](https://github.com/boddhisatt
 
 ## Usage
 
-### Setup with Docker
+### Run Freight Forwarder app in CLI mode with Docker
 
 1. Make sure you have Docker running locally
 
