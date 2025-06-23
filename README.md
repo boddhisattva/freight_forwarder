@@ -69,6 +69,6 @@ ruby bin/freight_finder.rb
 #### Running the tests
 * Run from the project's root directory the `rspec` command
 
-# Areas of Improvement: To Update
+## Areas of Improvement: To Update
 
-# Design considerations: To Update
+## Design considerations: To Update
