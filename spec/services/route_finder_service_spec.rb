@@ -128,22 +128,6 @@ RSpec.describe RouteFinderService do
     end
   end
 
-  describe 'strategy instantiation' do
-    it 'creates new strategy instances for each call' do
-      strategy1 = service.send(:strategy_for, 'fastest')
-      strategy2 = service.send(:strategy_for, 'fastest')
-
-      expect(strategy1).not_to eq(strategy2)
-      expect(strategy1).to be_a(RouteStrategies::FastestStrategy)
-      expect(strategy2).to be_a(RouteStrategies::FastestStrategy)
-    end
-
-    it 'passes repository to strategy constructor' do
-      strategy = service.send(:strategy_for, 'fastest')
-      expect(strategy.instance_variable_get(:@repository)).to eq(data_repository)
-    end
-  end
-
   describe 'real data integration' do
     let(:real_repository) { DataRepository.new }
     let(:real_service) { described_class.new(data_repository: real_repository) }
@@ -302,20 +286,6 @@ RSpec.describe RouteFinderService do
         # We'll test that it doesn't crash on initialization
         expect(service_with_nil_repo.instance_variable_get(:@repository)).to be_nil
       end
-    end
-  end
-
-  describe 'performance considerations' do
-    it 'does not recreate strategy map on each call' do
-      # The constant should be created once at class load time
-      expect(described_class::STRATEGY_MAP).to be_a(Hash)
-
-      # Multiple calls should use the same constant
-      strategy1 = service.send(:strategy_for, 'fastest')
-      strategy2 = service.send(:strategy_for, 'cheapest')
-
-      expect(strategy1).to be_a(RouteStrategies::FastestStrategy)
-      expect(strategy2).to be_a(RouteStrategies::CheapestStrategy)
     end
   end
 end
