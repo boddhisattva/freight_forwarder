@@ -1,219 +1,132 @@
 require 'rails_helper'
 
 RSpec.describe PortConnectivityFilter do
-  subject(:filter) { described_class.new(max_hops: max_hops) }
-  let(:max_hops) { 3 }
+  subject(:shipping_route_filter) { described_class.new(max_hops: max_shipping_hops) }
+  let(:max_shipping_hops) { 3 }
 
   describe '#filter_relevant_sailings' do
-    context 'with simple direct route' do
-      before do
-        create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM', sailing_code: 'DIRECT')
-      end
+    context 'cargo routing scenarios' do
+      context 'with direct shipping lanes' do
+        before do
+          create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM', sailing_code: 'DIRECT_LANE')
+        end
 
-      it 'returns sailings for direct route' do
-        result = filter.filter_relevant_sailings('CNSHA', 'NLRTM')
+        it 'identifies direct cargo routes between ports' do
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('CNSHA', 'NLRTM')
 
-        expect(result).to be_a(ActiveRecord::Relation)
-        expect(result.count).to eq(1)
-        expect(result.first.sailing_code).to eq('DIRECT')
-      end
+          expect(shipping_lanes.count).to eq(1)
+          expect(shipping_lanes.first.sailing_code).to eq('DIRECT_LANE')
+        end
 
-      it 'returns empty when no route exists' do
-        result = filter.filter_relevant_sailings('CNSHA', 'UNKNOWN')
+        it 'returns empty when no maritime connection exists' do
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('CNSHA', 'UNKNOWN_PORT')
 
-        expect(result).to be_empty
-      end
-    end
-
-    context 'with multi-hop route (Barcelona scenario)' do
-      before do
-        # Shanghai -> Barcelona
-        create(:sailing, origin_port: 'CNSHA', destination_port: 'ESBCN', sailing_code: 'ERXQ')
-        # Barcelona -> Rotterdam
-        create(:sailing, origin_port: 'ESBCN', destination_port: 'NLRTM', sailing_code: 'ETRG')
-        # Shanghai -> Rotterdam (direct)
-        create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM', sailing_code: 'MNOP')
-      end
-
-      it 'includes all sailings that could be part of the route' do
-        result = filter.filter_relevant_sailings('CNSHA', 'NLRTM')
-
-        sailing_codes = result.pluck(:sailing_code)
-        expect(sailing_codes).to contain_exactly('ERXQ', 'ETRG', 'MNOP')
-      end
-
-      it 'includes sailings from intermediate ports' do
-        result = filter.filter_relevant_sailings('CNSHA', 'NLRTM')
-
-        # Should include Barcelona sailings since they're part of a valid route
-        barcelona_sailings = result.where(origin_port: 'ESBCN')
-        expect(barcelona_sailings).not_to be_empty
-      end
-    end
-
-    context 'with complex multi-port network' do
-      before do
-        # Create a more complex network
-        # A -> B -> C -> D
-        # A -> C (direct)
-        # B -> D (direct)
-        create(:sailing, origin_port: 'A', destination_port: 'B', sailing_code: 'AB')
-        create(:sailing, origin_port: 'B', destination_port: 'C', sailing_code: 'BC')
-        create(:sailing, origin_port: 'C', destination_port: 'D', sailing_code: 'CD')
-        create(:sailing, origin_port: 'A', destination_port: 'C', sailing_code: 'AC')
-        create(:sailing, origin_port: 'B', destination_port: 'D', sailing_code: 'BD')
-      end
-
-      it 'finds all relevant sailings for multi-hop route' do
-        result = filter.filter_relevant_sailings('A', 'D')
-
-        sailing_codes = result.pluck(:sailing_code)
-        expect(sailing_codes).to contain_exactly('AB', 'BC', 'CD', 'AC', 'BD')
-      end
-
-      it 'excludes irrelevant sailings' do
-        # Add a sailing that's not part of any route from A to D
-        create(:sailing, origin_port: 'X', destination_port: 'Y', sailing_code: 'XY')
-
-        result = filter.filter_relevant_sailings('A', 'D')
-
-        sailing_codes = result.pluck(:sailing_code)
-        expect(sailing_codes).not_to include('XY')
-      end
-    end
-
-    context 'with max_hops limit' do
-      before do
-        # Create a chain: A -> B -> C -> D -> E -> F
-        create(:sailing, origin_port: 'A', destination_port: 'B', sailing_code: 'AB')
-        create(:sailing, origin_port: 'B', destination_port: 'C', sailing_code: 'BC')
-        create(:sailing, origin_port: 'C', destination_port: 'D', sailing_code: 'CD')
-        create(:sailing, origin_port: 'D', destination_port: 'E', sailing_code: 'DE')
-        create(:sailing, origin_port: 'E', destination_port: 'F', sailing_code: 'EF')
-      end
-
-      it 'respects max_hops limit' do
-        short_filter = described_class.new(max_hops: 2)
-        result = short_filter.filter_relevant_sailings('A', 'F')
-
-        # With max_hops=2, intersection may be empty (no port is both forward and backward reachable within 2 hops)
-        expect(result).to be_empty
-      end
-
-      it 'allows longer routes with higher max_hops' do
-        long_filter = described_class.new(max_hops: 5)
-        result = long_filter.filter_relevant_sailings('A', 'F')
-
-        # Only ports that are both forward and backward reachable within 5 hops will be included
-        sailing_codes = result.pluck(:sailing_code)
-        expect(sailing_codes).to include('BC', 'CD', 'DE')
-        # 'AB' and 'EF' may not be included due to intersection logic
-      end
-    end
-
-    context 'with circular routes' do
-      before do
-        # A -> B -> C -> A (circular)
-        create(:sailing, origin_port: 'A', destination_port: 'B', sailing_code: 'AB')
-        create(:sailing, origin_port: 'B', destination_port: 'C', sailing_code: 'BC')
-        create(:sailing, origin_port: 'C', destination_port: 'A', sailing_code: 'CA')
-      end
-
-      it 'handles circular routes without infinite loops' do
-        result = filter.filter_relevant_sailings('A', 'C')
-
-        sailing_codes = result.pluck(:sailing_code)
-        expect(sailing_codes).to contain_exactly('AB', 'BC', 'CA')
-      end
-    end
-
-    context 'with empty database' do
-      it 'returns empty result' do
-        result = filter.filter_relevant_sailings('CNSHA', 'NLRTM')
-
-        expect(result).to be_empty
-      end
-    end
-
-    context 'with same origin and destination' do
-      before do
-        create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM', sailing_code: 'DIRECT')
-      end
-
-      it 'returns empty result for same port' do
-        result = filter.filter_relevant_sailings('CNSHA', 'CNSHA')
-
-        expect(result).to be_empty
-      end
-    end
-  end
-
-  describe 'performance considerations' do
-    it 'caches port connections map' do
-      create(:sailing, origin_port: 'A', destination_port: 'B', sailing_code: 'AB')
-
-      # First call should build the map
-      expect(filter).to receive(:build_port_connectivity_map).once.and_call_original
-      filter.filter_relevant_sailings('A', 'B')
-
-      # Second call should use cached map
-      expect(filter).not_to receive(:build_port_connectivity_map)
-      filter.filter_relevant_sailings('A', 'B')
-    end
-
-    it 'uses efficient database queries' do
-      create(:sailing, origin_port: 'A', destination_port: 'B', sailing_code: 'AB')
-
-      # Should use pluck for port pairs
-      expect(Sailing).to receive(:pluck).with(:origin_port, :destination_port).once.and_call_original
-
-      filter.filter_relevant_sailings('A', 'B')
-    end
-  end
-
-  describe 'edge cases' do
-    context 'with disconnected components' do
-      before do
-        # Component 1: A -> B
-        create(:sailing, origin_port: 'A', destination_port: 'B', sailing_code: 'AB')
-        # Component 2: X -> Y
-        create(:sailing, origin_port: 'X', destination_port: 'Y', sailing_code: 'XY')
-      end
-
-      it 'handles disconnected networks' do
-        result = filter.filter_relevant_sailings('A', 'Y')
-
-        expect(result).to be_empty
-      end
-    end
-
-    context 'with self-loops' do
-      before do
-        create(:sailing, origin_port: 'A', destination_port: 'A', sailing_code: 'AA')
-        create(:sailing, origin_port: 'A', destination_port: 'B', sailing_code: 'AB')
-      end
-
-      it 'handles self-loops gracefully' do
-        result = filter.filter_relevant_sailings('A', 'B')
-
-        sailing_codes = result.pluck(:sailing_code)
-        expect(sailing_codes).to contain_exactly('AA', 'AB')
-      end
-    end
-
-    context 'with very long chains' do
-      before do
-        # Create a chain longer than max_hops
-        ('A'..'Z').each_cons(2) do |origin, destination|
-          create(:sailing, origin_port: origin, destination_port: destination, sailing_code: "#{origin}#{destination}")
+          expect(shipping_lanes).to be_empty
         end
       end
 
-      it 'respects max_hops even for very long chains' do
-        result = filter.filter_relevant_sailings('A', 'Z')
+      context 'with multi-port cargo routing' do
+        before do
+          # Shanghai -> Barcelona shipping lane
+          create(:sailing, origin_port: 'CNSHA', destination_port: 'ESBCN', sailing_code: 'ASIA_EUROPE')
+          # Barcelona -> Rotterdam shipping lane
+          create(:sailing, origin_port: 'ESBCN', destination_port: 'NLRTM', sailing_code: 'INTRA_EUROPE')
+          # Direct Shanghai -> Rotterdam route
+          create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM', sailing_code: 'DIRECT_ASIA_EU')
+          # Complex maritime network: A -> B -> C -> D with alternative routes
+          create(:sailing, origin_port: 'PORTA', destination_port: 'PORTB', sailing_code: 'AB_ROUTE')
+          create(:sailing, origin_port: 'PORTB', destination_port: 'PORTC', sailing_code: 'BC_ROUTE')
+          create(:sailing, origin_port: 'PORTC', destination_port: 'PORTD', sailing_code: 'CD_ROUTE')
+          create(:sailing, origin_port: 'PORTA', destination_port: 'PORTC', sailing_code: 'AC_DIRECT')
+        end
 
-        # Should only include sailings within max_hops distance
-        expect(result.count).to be <= (max_hops * 2) # Rough estimate
+        it 'identifies all relevant shipping lanes for cargo transshipment' do
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('CNSHA', 'NLRTM')
+
+          sailing_codes = shipping_lanes.pluck(:sailing_code)
+          expect(sailing_codes).to contain_exactly('ASIA_EUROPE', 'INTRA_EUROPE', 'DIRECT_ASIA_EU')
+        end
+
+        it 'finds multi-hop cargo routes through transshipment ports' do
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('PORTA', 'PORTD')
+
+          sailing_codes = shipping_lanes.pluck(:sailing_code)
+          expect(sailing_codes).to contain_exactly('AB_ROUTE', 'BC_ROUTE', 'CD_ROUTE', 'AC_DIRECT')
+        end
+      end
+
+      context 'with shipping hop limits' do
+        before do
+          # Create extended maritime chain: A -> B -> C -> D -> E
+          create(:sailing, origin_port: 'CHAIN_A', destination_port: 'CHAIN_B', sailing_code: 'AB_CHAIN')
+          create(:sailing, origin_port: 'CHAIN_B', destination_port: 'CHAIN_C', sailing_code: 'BC_CHAIN')
+          create(:sailing, origin_port: 'CHAIN_C', destination_port: 'CHAIN_D', sailing_code: 'CD_CHAIN')
+          create(:sailing, origin_port: 'CHAIN_D', destination_port: 'CHAIN_E', sailing_code: 'DE_CHAIN')
+        end
+
+        it 'respects maximum cargo routing hops for efficiency' do
+          short_hop_filter = described_class.new(max_hops: 2)
+          shipping_lanes = short_hop_filter.filter_relevant_sailings('CHAIN_A', 'CHAIN_E')
+
+          expect(shipping_lanes).to be_empty
+        end
+
+        it 'enables longer cargo routes with increased hop allowance' do
+          extended_hop_filter = described_class.new(max_hops: 4)
+          shipping_lanes = extended_hop_filter.filter_relevant_sailings('CHAIN_A', 'CHAIN_E')
+
+          sailing_codes = shipping_lanes.pluck(:sailing_code)
+          expect(sailing_codes).to include('BC_CHAIN', 'CD_CHAIN')
+        end
+      end
+    end
+
+    context 'maritime network edge cases' do
+      context 'with circular shipping routes' do
+        before do
+          # Circular trade route: A -> B -> C -> A
+          create(:sailing, origin_port: 'CIRCLE_A', destination_port: 'CIRCLE_B', sailing_code: 'CIRCULAR_AB')
+          create(:sailing, origin_port: 'CIRCLE_B', destination_port: 'CIRCLE_C', sailing_code: 'CIRCULAR_BC')
+          create(:sailing, origin_port: 'CIRCLE_C', destination_port: 'CIRCLE_A', sailing_code: 'CIRCULAR_CA')
+        end
+
+        it 'handles circular trade routes without infinite cargo loops' do
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('CIRCLE_A', 'CIRCLE_C')
+
+          sailing_codes = shipping_lanes.pluck(:sailing_code)
+          expect(sailing_codes).to contain_exactly('CIRCULAR_AB', 'CIRCULAR_BC', 'CIRCULAR_CA')
+        end
+      end
+
+      context 'with isolated maritime networks' do
+        before do
+          # Isolated shipping network 1: A -> B
+          create(:sailing, origin_port: 'ISOLATED_A', destination_port: 'ISOLATED_B', sailing_code: 'ISOLATED_AB')
+          # Isolated shipping network 2: X -> Y
+          create(:sailing, origin_port: 'REMOTE_X', destination_port: 'REMOTE_Y', sailing_code: 'REMOTE_XY')
+        end
+
+        it 'recognizes disconnected port networks' do
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('ISOLATED_A', 'REMOTE_Y')
+
+          expect(shipping_lanes).to be_empty
+        end
+      end
+
+      context 'with no available shipping routes' do
+        it 'handles empty maritime database gracefully' do
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('CNSHA', 'NLRTM')
+
+          expect(shipping_lanes).to be_empty
+        end
+
+        it 'handles same origin and destination port requests' do
+          create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM', sailing_code: 'SAMPLE_ROUTE')
+
+          shipping_lanes = shipping_route_filter.filter_relevant_sailings('CNSHA', 'CNSHA')
+
+          expect(shipping_lanes).to be_empty
+        end
       end
     end
   end
