@@ -11,11 +11,11 @@ class JourneyTimeCalculator < JourneyCalculator
   private
 
   def port_layover_time(ship_arrival, next_ship_departure)
-    waiting_days = (next_ship_departure - ship_arrival).to_i
+    waiting_days = (next_ship_departure.to_date - ship_arrival.to_date).to_i
     [ 0, waiting_days ].max  # Can't have negative waiting time!
   end
 
   def sailing_duration(departure_date, arrival_date)
-    (arrival_date - departure_date).to_i
+    (arrival_date.to_date - departure_date.to_date).to_i
   end
 end
