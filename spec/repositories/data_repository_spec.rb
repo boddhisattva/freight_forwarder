@@ -55,7 +55,11 @@ RSpec.describe DataRepository do
 
     context 'when database error occurs' do
       before do
-        allow(Sailing).to receive(:find_or_create_by).and_raise(ActiveRecord::RecordInvalid)
+        # Stub the sailing repository method that is actually called
+        sailing_repo = instance_double(SailingRepository)
+        allow(SailingRepository).to receive(:new).and_return(sailing_repo)
+        allow(sailing_repo).to receive(:find_or_create_sailing_with_rate)
+          .and_raise(ActiveRecord::RecordInvalid.new(Sailing.new))
       end
 
       it 'rolls back transaction' do
@@ -84,7 +88,7 @@ RSpec.describe DataRepository do
     end
 
     it 'delegates to sailing repository' do
-      expected_result = [ FactoryBot.build_stubbed(:sailing) ]
+      expected_result = [ build_stubbed(:sailing) ]
 
       expect(sailing_repository)
         .to receive(:find_direct_sailings)

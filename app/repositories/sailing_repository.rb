@@ -13,7 +13,7 @@ class SailingRepository
   private
 
   def find_or_create_sailing(sailing_data)
-    Sailing.find_or_create_by(
+    Sailing.find_or_create_by!(
       sailing_code: sailing_data["sailing_code"]
     ) do |sailing|
       sailing.origin_port = sailing_data["origin_port"]
@@ -24,7 +24,7 @@ class SailingRepository
   end
 
   def create_rate_for_sailing(sailing, rate_data)
-    Rate.find_or_create_by(sailing: sailing) do |rate|
+    Rate.find_or_create_by!(sailing: sailing) do |rate|
       rate.amount = convert_to_money_object(rate_data)
       rate.currency = rate_data["rate_currency"]
     end
