@@ -14,6 +14,7 @@
 # Indexes
 #
 #  index_sailings_on_origin_port_and_destination_port  (origin_port,destination_port)
+#  index_sailings_on_sailing_code                      (sailing_code)
 #
 class Sailing < ApplicationRecord
   has_one :rate, dependent: :destroy
@@ -29,6 +30,18 @@ class Sailing < ApplicationRecord
 
   def duration_days
     ((arrival_date - departure_date) / 1.day).ceil
+  end
+
+  def as_route_hash
+    {
+      origin_port: origin_port,
+      destination_port: destination_port,
+      departure_date: departure_date.strftime("%Y-%m-%d"),
+      arrival_date: arrival_date.strftime("%Y-%m-%d"),
+      sailing_code: sailing_code,
+      rate: rate ? sprintf("%.2f", rate.amount.to_f) : nil,
+      rate_currency: rate ? rate.currency : nil
+    }
   end
 
   private

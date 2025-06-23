@@ -14,6 +14,7 @@
 # Indexes
 #
 #  index_sailings_on_origin_port_and_destination_port  (origin_port,destination_port)
+#  index_sailings_on_sailing_code                      (sailing_code)
 #
 require 'rails_helper'
 
@@ -152,6 +153,48 @@ RSpec.describe Sailing, type: :model do
       fastest_route = direct_routes.min_by(&:duration_days)
       expect(fastest_route.sailing_code).to eq('QRST')
       expect(fastest_route.duration_days).to eq(17)
+    end
+  end
+
+  describe '#as_route_hash' do
+    let(:departure_date) { Date.parse('2022-01-29') }
+    let(:arrival_date) { Date.parse('2022-02-01') }
+    let(:sailing) do
+      build_stubbed(:sailing,
+        origin_port: 'CNSHA',
+        destination_port: 'NLRTM',
+        departure_date: departure_date,
+        arrival_date: arrival_date,
+        sailing_code: 'ERXQ'
+      )
+    end
+    let(:rate) { build_stubbed(:rate, amount_cents: 100000, currency: 'USD') }
+
+    before { allow(sailing).to receive(:rate).and_return(rate) }
+
+    it 'returns a formatted hash with rate' do
+      expect(sailing.as_route_hash).to eq({
+        origin_port: 'CNSHA',
+        destination_port: 'NLRTM',
+        departure_date: '2022-01-29',
+        arrival_date: '2022-02-01',
+        sailing_code: 'ERXQ',
+        rate: '1000.00',
+        rate_currency: 'USD'
+      })
+    end
+
+    it 'returns a formatted hash without rate' do
+      allow(sailing).to receive(:rate).and_return(nil)
+      expect(sailing.as_route_hash).to eq({
+        origin_port: 'CNSHA',
+        destination_port: 'NLRTM',
+        departure_date: '2022-01-29',
+        arrival_date: '2022-02-01',
+        sailing_code: 'ERXQ',
+        rate: nil,
+        rate_currency: nil
+      })
     end
   end
 end
