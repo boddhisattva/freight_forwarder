@@ -93,12 +93,9 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
       end
     end
 
-    context 'with actual response.json data' do
+    context 'with minimal real data' do
       before do
-        # Load data from response.json
-        response_data = JSON.parse(File.read(Rails.root.join('db', 'response.json')))
-
-        # Create real sailings from response.json
+        # Create only the sailings needed for CNSHA->NLRTM direct route test
         @sailing_abcd = create(:sailing,
           origin_port: 'CNSHA',
           destination_port: 'NLRTM',
@@ -123,7 +120,7 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
           sailing_code: 'QRST'
         )
 
-        # Create real rates from response.json
+        # Create rates for the sailings
         create(:rate,
           sailing: @sailing_abcd,
           amount_cents: 58930, # 589.30 USD
@@ -142,7 +139,7 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
           currency: 'EUR'
         )
 
-        # Create real exchange rates from response.json
+        # Create only the exchange rates needed for the test dates
         create(:exchange_rate,
           departure_date: Date.parse('2022-01-29'),
           currency: 'usd',
@@ -161,13 +158,13 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
           rate: 1.126
         )
 
-        # Use real repository instead of mock
+        # Use real repository and currency converter
         @real_repository = DataRepository.new
         @real_currency_converter = CurrencyConverter.new
         @real_strategy = described_class.new(@real_repository, currency_converter: @real_currency_converter)
       end
 
-      it 'returns MNOP as cheapest direct sailing from sample data' do
+      it 'returns MNOP as cheapest direct sailing from minimal test data' do
         result = @real_strategy.find_route('CNSHA', 'NLRTM')
 
         expect(result.length).to eq(1)
@@ -176,6 +173,16 @@ RSpec.describe RouteStrategies::CheapestDirect, type: :service do
         expect(cheapest_route[:sailing_code]).to eq('MNOP')
         expect(cheapest_route[:rate]).to eq('456.78')
         expect(cheapest_route[:rate_currency]).to eq('USD')
+      end
+
+      it 'handles currency conversion correctly with real data' do
+        result = @real_strategy.find_route('CNSHA', 'NLRTM')
+
+        # Verify that currency conversion is working
+        # MNOP should be cheapest: 456.78 USD / 1.1138 = ~410.11 EUR
+        # QRST: 761.96 EUR (direct)
+        # ABCD: 589.30 USD / 1.126 = ~523.36 EUR
+        expect(result.first[:sailing_code]).to eq('MNOP')
       end
     end
 
