@@ -15,27 +15,17 @@ For Fastest: It makes use of Dijkstra's Algorithm
 2. **Make scripts executable:**
    ```bash
    chmod +x entrypoint.sh
-   chmod +x test_freight_finder.sh
+   chmod +x setup_freight_finder.sh
    ```
 
 3. **Clean rebuild:**
    ```bash
    docker-compose down
    docker system prune -f
-   docker-compose build --no-cache
+   ./setup_freight_finder.sh
    ```
 
-4. **Run the application:**
-   ```bash
-   docker-compose up
-   ```
-
-5. **Run tests:**
-   ```bash
-   ./test_freight_finder.sh
-   ```
-
-6. To run the app with Docker:
+4. To run the app with Docker:
 
 ```
 docker-compose run --rm freight_finder ruby bin/freight_finder.rb
@@ -62,9 +52,9 @@ docker-compose run --rm freight_finder ruby bin/freight_finder.rb
 
 #### Running the Rails app in CLI mode with
 
+```
 ruby bin/freight_finder.rb
-
-* Start the rails app with: `rails s`
+```
 
 #### Running the tests
 * Run from the project's root directory the `rspec` command

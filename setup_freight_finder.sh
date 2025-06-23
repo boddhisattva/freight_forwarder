@@ -1,31 +1,12 @@
 #!/bin/bash
 
-# Test script for Freight Finder CLI
+# Setup script for Freight Forwarder CLI
 set -e
 
-echo "🚢 Testing Freight Finder CLI with Sample Data"
+echo "🚢 Your Freight Forwarder CLI with sample data is being setup. Please allow for a few minutes."
 echo "=============================================="
 
-# Function to test CLI with input (commented out for later use)
-# test_cli() {
-#     local test_name="$1"
-#     local origin="$2"
-#     local destination="$3"
-#     local criteria="$4"
 
-#     echo ""
-#     echo "🧪 Testing: $test_name"
-#     echo "Input: $origin -> $destination ($criteria)"
-#     echo "Response:"
-
-#     # Create input file
-#     echo -e "$origin\n$destination\n$criteria" > /tmp/test_input.txt
-
-#     # Run the CLI
-#     docker-compose run --rm -T freight_finder ruby bin/freight_finder.rb < /tmp/test_input.txt
-
-#     echo "✅ Test completed"
-# }
 
 # Start services
 echo "🐳 Starting Docker services..."
@@ -63,12 +44,3 @@ echo "docker-compose run --rm freight_finder ruby bin/freight_finder.rb"
 echo ""
 echo "To stop services:"
 echo "docker-compose down"
-
-# Commented out test cases for later use
-# Test cases from problem statement
-# test_cli "Cheapest Direct Route" "CNSHA" "NLRTM" "cheapest-direct"
-# test_cli "Cheapest Route (Any)" "CNSHA" "NLRTM" "cheapest"
-# test_cli "Fastest Route" "CNSHA" "NLRTM" "fastest"
-
-# Additional test cases
-# test_cli "Alternative Route Test" "CNSHA" "ESBCN" "cheapest-direct"
