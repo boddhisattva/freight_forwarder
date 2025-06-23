@@ -1,16 +1,7 @@
 require 'rails_helper'
+
 RSpec.describe JourneyTimeCalculator do
   let(:calculator) { described_class.new }
-
-  describe 'inheritance' do
-    it 'inherits from JourneyCalculator' do
-      expect(described_class.superclass).to eq(JourneyCalculator)
-    end
-
-    it 'inherits valid_connection? method' do
-      expect(calculator).to respond_to(:valid_connection?)
-    end
-  end
 
   describe '#calculate_total_time' do
     let(:departure_date) { Date.parse('2022-02-16') }

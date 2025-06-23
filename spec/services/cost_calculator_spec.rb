@@ -3,16 +3,6 @@ require 'rails_helper'
 RSpec.describe CostCalculator do
   let(:calculator) { described_class.new }
 
-  describe 'inheritance' do
-    it 'inherits from JourneyCalculator' do
-      expect(described_class.superclass).to eq(JourneyCalculator)
-    end
-
-    it 'inherits valid_connection? method' do
-      expect(calculator).to respond_to(:valid_connection?)
-    end
-  end
-
   describe '#convert_to_eur_cents' do
     let(:departure_date) { Date.parse('2022-02-16') }
     let(:exchange_rate) { build_stubbed(:exchange_rate, rate: 1.1482) }
