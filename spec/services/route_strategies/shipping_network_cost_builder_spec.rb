@@ -5,8 +5,8 @@ RSpec.describe RouteStrategies::ShippingNetworkCostBuilder do
   let(:currency_converter) { instance_double('CurrencyConverter') }
 
   describe '#build_from_sailings' do
-    context 'with valid sailings' do
-      let(:shanghai_to_barcelona) { build_stubbed(:sailing,
+    context 'cost-specific behavior' do
+      let(:sailing) { build_stubbed(:sailing,
         origin_port: 'CNSHA',
         destination_port: 'ESBCN',
         departure_date: Date.parse('2022-01-29'),
@@ -14,208 +14,104 @@ RSpec.describe RouteStrategies::ShippingNetworkCostBuilder do
         sailing_code: 'ERXQ'
       ) }
 
-      let(:barcelona_to_rotterdam) { build_stubbed(:sailing,
-        origin_port: 'ESBCN',
-        destination_port: 'NLRTM',
-        departure_date: Date.parse('2022-02-16'),
-        arrival_date: Date.parse('2022-02-20'),
-        sailing_code: 'ETRG'
-      ) }
-
-      let(:shanghai_rate) { instance_double('Rate', amount: Money.new(26196, 'EUR')) }
-      let(:barcelona_rate) { instance_double('Rate', amount: Money.new(6996, 'USD')) }
+      let(:rate) { instance_double('Rate', amount: Money.new(26196, 'EUR')) }
 
       before do
-        allow(shanghai_to_barcelona).to receive(:rate).and_return(shanghai_rate)
-        allow(barcelona_to_rotterdam).to receive(:rate).and_return(barcelona_rate)
-
+        allow(sailing).to receive(:rate).and_return(rate)
         allow(currency_converter).to receive(:convert_to_eur)
           .with(Money.new(26196, 'EUR'), Date.parse('2022-01-29'))
           .and_return(Money.new(26196, 'EUR'))
-
-        allow(currency_converter).to receive(:convert_to_eur)
-          .with(Money.new(6996, 'USD'), Date.parse('2022-02-16'))
-          .and_return(Money.new(6093, 'EUR'))
       end
 
-      it 'creates graph with correct structure' do
-        sailings = [ shanghai_to_barcelona, barcelona_to_rotterdam ]
-
-        result = builder.build_from_sailings(sailings)
-
-        expect(result.keys).to contain_exactly('CNSHA', 'ESBCN')
-        expect(result['CNSHA'].size).to eq(1)
-        expect(result['ESBCN'].size).to eq(1)
-      end
-
-      it 'creates correct edge structure for each sailing' do
-        sailings = [ shanghai_to_barcelona ]
-
-        result = builder.build_from_sailings(sailings)
+      it 'creates cost-optimized route option with EUR conversion' do
+        result = builder.build_from_sailings([ sailing ])
         edge = result['CNSHA'].first
 
-        expect(edge[:sailing]).to eq(shanghai_to_barcelona)
+        expect(edge[:sailing]).to eq(sailing)
         expect(edge[:destination]).to eq('ESBCN')
         expect(edge[:cost_cents]).to eq(26196)
-        expect(edge[:departure_date]).to eq(shanghai_to_barcelona.departure_date)
-        expect(edge[:arrival_date]).to eq(shanghai_to_barcelona.arrival_date)
+        expect(edge[:departure_date]).to eq(sailing.departure_date)
+        expect(edge[:arrival_date]).to eq(sailing.arrival_date)
       end
 
-      it 'builds multi-port graph correctly' do
-        direct_route = build_stubbed(:sailing,
-          origin_port: 'CNSHA',
-          destination_port: 'NLRTM',
-          sailing_code: 'MNOP'
-        )
-        direct_rate = instance_double('Rate', amount: Money.new(45678, 'USD'))
-        allow(direct_route).to receive(:rate).and_return(direct_rate)
-
-        allow(currency_converter).to receive(:convert_to_eur)
-          .with(Money.new(45678, 'USD'), direct_route.departure_date)
-          .and_return(Money.new(41013, 'EUR'))
-
-        sailings = [ shanghai_to_barcelona, barcelona_to_rotterdam, direct_route ]
-
-        result = builder.build_from_sailings(sailings)
-
-        expect(result['CNSHA'].size).to eq(2) # Two routes from Shanghai
-        expect(result['ESBCN'].size).to eq(1)  # One route from Barcelona
-      end
-    end
-
-    context 'with sailings without rates' do
-      it 'excludes sailings that have no rate' do
-        sailing_with_rate = build_stubbed(:sailing, origin_port: 'CNSHA')
-        sailing_without_rate = build_stubbed(:sailing, origin_port: 'ESBCN')
-        rate = instance_double('Rate', amount: Money.new(26196, 'EUR'))
-
-        allow(sailing_with_rate).to receive(:rate).and_return(rate)
-        allow(sailing_without_rate).to receive(:rate).and_return(nil)
-
-        allow(currency_converter).to receive(:convert_to_eur)
-          .with(Money.new(26196, 'EUR'), sailing_with_rate.departure_date)
-          .and_return(Money.new(26196, 'EUR'))
-
-        sailings = [ sailing_with_rate, sailing_without_rate ]
-
-        result = builder.build_from_sailings(sailings)
-
-        expect(result.keys).to contain_exactly('CNSHA')
-        expect(result['ESBCN']).to be_empty
-      end
-    end
-
-    context 'with empty sailings array' do
-      it 'returns empty graph' do
-        result = builder.build_from_sailings([])
-
-        expect(result).to be_empty
-      end
-    end
-
-    context 'with multiple sailings from same port' do
-      let(:first_sailing) { build_stubbed(:sailing,
-        origin_port: 'CNSHA',
-        destination_port: 'NLRTM',
-        sailing_code: 'ABCD'
-      ) }
-
-      let(:second_sailing) { build_stubbed(:sailing,
-        origin_port: 'CNSHA',
-        destination_port: 'NLRTM',
-        sailing_code: 'EFGH'
-      ) }
-
-      let(:first_rate) { instance_double('Rate', amount: Money.new(58930, 'USD')) }
-      let(:second_rate) { instance_double('Rate', amount: Money.new(89032, 'EUR')) }
-
-      before do
-        allow(first_sailing).to receive(:rate).and_return(first_rate)
-        allow(second_sailing).to receive(:rate).and_return(second_rate)
-
-        allow(currency_converter).to receive(:convert_to_eur)
-          .with(Money.new(58930, 'USD'), first_sailing.departure_date)
-          .and_return(Money.new(58930, 'EUR'))
-
-        allow(currency_converter).to receive(:convert_to_eur)
-          .with(Money.new(89032, 'EUR'), second_sailing.departure_date)
-          .and_return(Money.new(89032, 'EUR'))
-      end
-
-      it 'includes all sailings as separate edges' do
-        sailings = [ first_sailing, second_sailing ]
-
-        result = builder.build_from_sailings(sailings)
-
-        expect(result['CNSHA'].size).to eq(2)
-        sailing_codes = result['CNSHA'].map { |edge| edge[:sailing].sailing_code }
-        expect(sailing_codes).to contain_exactly('ABCD', 'EFGH')
-      end
-    end
-
-    context 'with real response.json data structure' do
-      before do
-        # Setup exchange rates for cost calculations
-        ExchangeRate.create!(departure_date: Date.parse('2022-01-29'), currency: 'usd', rate: 1.1138)
-        ExchangeRate.create!(departure_date: Date.parse('2022-02-16'), currency: 'usd', rate: 1.1482)
-      end
-
-      it 'correctly processes Barcelona route from response.json' do
-        erxq = create(:sailing,
-          origin_port: 'CNSHA', destination_port: 'ESBCN',
-          departure_date: Date.parse('2022-01-29'),
-          arrival_date: Date.parse('2022-02-12'),
-          sailing_code: 'ERXQ'
-        )
-        create(:rate, sailing: erxq, amount: Money.new(26196, 'EUR'), currency: 'EUR')
-
-        etrg = create(:sailing,
-          origin_port: 'ESBCN', destination_port: 'NLRTM',
+      it 'converts USD rates to EUR using departure date' do
+        usd_sailing = build_stubbed(:sailing,
           departure_date: Date.parse('2022-02-16'),
-          arrival_date: Date.parse('2022-02-20'),
           sailing_code: 'ETRG'
         )
-        create(:rate, sailing: etrg, amount: Money.new(6996, 'USD'), currency: 'USD')
+        usd_rate = instance_double('Rate', amount: Money.new(6996, 'USD'))
 
-        # Mock currency converter for the real objects
-        allow(currency_converter).to receive(:convert_to_eur)
-          .with(Money.new(26196, 'EUR'), Date.parse('2022-01-29'))
-          .and_return(Money.new(26196, 'EUR'))
-
+        allow(usd_sailing).to receive(:rate).and_return(usd_rate)
         allow(currency_converter).to receive(:convert_to_eur)
           .with(Money.new(6996, 'USD'), Date.parse('2022-02-16'))
           .and_return(Money.new(6093, 'EUR'))
 
-        sailings = [ erxq, etrg ]
+        result = builder.build_from_sailings([ usd_sailing ])
+        edge = result[usd_sailing.origin_port].first
 
-        result = builder.build_from_sailings(sailings)
+        expect(edge[:cost_cents]).to eq(6093)
+        expect(currency_converter).to have_received(:convert_to_eur)
+          .with(Money.new(6996, 'USD'), Date.parse('2022-02-16'))
+      end
 
-        # Verify Barcelona leg
-        barcelona_edge = result['CNSHA'].first
-        expect(barcelona_edge[:cost_cents]).to eq(26196) # €261.96
+      it 'handles multiple currencies in single request' do
+        eur_sailing = build_stubbed(:sailing, sailing_code: 'EUR1')
+        usd_sailing = build_stubbed(:sailing, sailing_code: 'USD1')
 
-        # Verify Rotterdam leg
-        rotterdam_edge = result['ESBCN'].first
-        expect(rotterdam_edge[:cost_cents]).to eq(6093) # $69.96 / 1.1482 ≈ €60.93
+        eur_rate = instance_double('Rate', amount: Money.new(10000, 'EUR'))
+        usd_rate = instance_double('Rate', amount: Money.new(15000, 'USD'))
+
+        allow(eur_sailing).to receive(:rate).and_return(eur_rate)
+        allow(usd_sailing).to receive(:rate).and_return(usd_rate)
+
+        allow(currency_converter).to receive(:convert_to_eur)
+          .with(Money.new(10000, 'EUR'), eur_sailing.departure_date)
+          .and_return(Money.new(10000, 'EUR'))
+        allow(currency_converter).to receive(:convert_to_eur)
+          .with(Money.new(15000, 'USD'), usd_sailing.departure_date)
+          .and_return(Money.new(13043, 'EUR'))
+
+        result = builder.build_from_sailings([ eur_sailing, usd_sailing ])
+
+        eur_edge = result[eur_sailing.origin_port].find { |e| e[:sailing] == eur_sailing }
+        usd_edge = result[usd_sailing.origin_port].find { |e| e[:sailing] == usd_sailing }
+
+        expect(eur_edge[:cost_cents]).to eq(10000)
+        expect(usd_edge[:cost_cents]).to eq(13043)
+      end
+    end
+
+    context 'cost calculation edge cases' do
+      it 'handles zero-cost sailings correctly' do
+        free_sailing = build_stubbed(:sailing)
+        free_rate = instance_double('Rate', amount: Money.new(0, 'EUR'))
+
+        allow(free_sailing).to receive(:rate).and_return(free_rate)
+        allow(currency_converter).to receive(:convert_to_eur)
+          .and_return(Money.new(0, 'EUR'))
+
+        result = builder.build_from_sailings([ free_sailing ])
+        edge = result[free_sailing.origin_port].first
+
+        expect(edge[:cost_cents]).to eq(0)
       end
     end
   end
 
-  describe 'inheritance' do
-    it 'inherits from ShippingNetworkBuilder' do
-      expect(described_class.superclass).to eq(RouteStrategies::ShippingNetworkBuilder)
-    end
+  describe 'currency conversion delegation' do
+    it 'delegates currency conversion with correct parameters' do
+      sailing = build_stubbed(:sailing, departure_date: Date.parse('2022-01-15'))
+      rate = instance_double('Rate', amount: Money.new(5000, 'JPY'))
 
-    it 'implements the template method' do
-      sailing = build_stubbed(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM')
-      rate = instance_double('Rate', amount: Money.new(1000, 'EUR'))
       allow(sailing).to receive(:rate).and_return(rate)
-      allow(currency_converter).to receive(:convert_to_eur).and_return(Money.new(1000, 'EUR'))
+      allow(currency_converter).to receive(:convert_to_eur)
+        .with(Money.new(5000, 'JPY'), Date.parse('2022-01-15'))
+        .and_return(Money.new(3830, 'EUR'))
 
-      result = builder.build_from_sailings([ sailing ])
+      builder.build_from_sailings([ sailing ])
 
-      expect(result['CNSHA'].first).to include(:cost_cents)
-      expect(result['CNSHA'].first[:cost_cents]).to eq(1000)
+      expect(currency_converter).to have_received(:convert_to_eur)
+        .with(Money.new(5000, 'JPY'), Date.parse('2022-01-15'))
     end
   end
 end
