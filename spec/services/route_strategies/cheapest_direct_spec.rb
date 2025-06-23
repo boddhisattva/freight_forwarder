@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe RouteStrategies::CheapestDirectStrategy, type: :service do
+RSpec.describe RouteStrategies::CheapestDirect, type: :service do
   subject(:strategy) { described_class.new(repository, currency_converter: currency_converter) }
 
   let(:repository) { instance_double('DataRepository') }

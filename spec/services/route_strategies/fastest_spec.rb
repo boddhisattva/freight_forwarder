@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe RouteStrategies::FastestStrategy do
+RSpec.describe RouteStrategies::Fastest do
   let(:repository) { instance_double(DataRepository) }
   subject(:strategy) { described_class.new(repository) }
 

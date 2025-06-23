@@ -1,6 +1,6 @@
 # app/services/route_strategies/cheapest_strategy.rb
 module RouteStrategies
-  class CheapestStrategy < BaseStrategy
+  class Cheapest < Base
     def initialize(repository)
       super
       @shipping_network_builder = ShippingNetworkCostBuilder.new(@currency_converter)

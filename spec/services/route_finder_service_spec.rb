@@ -20,7 +20,7 @@ RSpec.describe RouteFinderService do
   describe '#find_route' do
     let(:origin_port) { 'CNSHA' }
     let(:destination_port) { 'NLRTM' }
-    let(:mock_strategy) { instance_double(RouteStrategies::FastestStrategy) }
+    let(:mock_strategy) { instance_double(RouteStrategies::Fastest) }
     let(:mock_route) { [ build_stubbed(:sailing) ] }
 
     before do
@@ -28,37 +28,37 @@ RSpec.describe RouteFinderService do
     end
 
     context 'with fastest criteria' do
-      it 'uses FastestStrategy and returns route' do
-        allow(RouteStrategies::FastestStrategy).to receive(:new).with(data_repository).and_return(mock_strategy)
+      it 'uses Fastest and returns route' do
+        allow(RouteStrategies::Fastest).to receive(:new).with(data_repository).and_return(mock_strategy)
 
         result = service.find_route(origin_port, destination_port, 'fastest')
 
         expect(result).to eq(mock_route)
-        expect(RouteStrategies::FastestStrategy).to have_received(:new).with(data_repository)
+        expect(RouteStrategies::Fastest).to have_received(:new).with(data_repository)
         expect(mock_strategy).to have_received(:find_route).with(origin_port, destination_port)
       end
     end
 
     context 'with cheapest criteria' do
-      it 'uses CheapestStrategy and returns route' do
-        allow(RouteStrategies::CheapestStrategy).to receive(:new).with(data_repository).and_return(mock_strategy)
+      it 'uses Cheapest and returns route' do
+        allow(RouteStrategies::Cheapest).to receive(:new).with(data_repository).and_return(mock_strategy)
 
         result = service.find_route(origin_port, destination_port, 'cheapest')
 
         expect(result).to eq(mock_route)
-        expect(RouteStrategies::CheapestStrategy).to have_received(:new).with(data_repository)
+        expect(RouteStrategies::Cheapest).to have_received(:new).with(data_repository)
         expect(mock_strategy).to have_received(:find_route).with(origin_port, destination_port)
       end
     end
 
     context 'with cheapest-direct criteria' do
-      it 'uses CheapestDirectStrategy and returns route' do
-        allow(RouteStrategies::CheapestDirectStrategy).to receive(:new).with(data_repository).and_return(mock_strategy)
+      it 'uses CheapestDirect and returns route' do
+        allow(RouteStrategies::CheapestDirect).to receive(:new).with(data_repository).and_return(mock_strategy)
 
         result = service.find_route(origin_port, destination_port, 'cheapest-direct')
 
         expect(result).to eq(mock_route)
-        expect(RouteStrategies::CheapestDirectStrategy).to have_received(:new).with(data_repository)
+        expect(RouteStrategies::CheapestDirect).to have_received(:new).with(data_repository)
         expect(mock_strategy).to have_received(:find_route).with(origin_port, destination_port)
       end
     end
@@ -85,7 +85,7 @@ RSpec.describe RouteFinderService do
 
     context 'with different port combinations' do
       it 'passes correct ports to strategy' do
-        allow(RouteStrategies::FastestStrategy).to receive(:new).with(data_repository).and_return(mock_strategy)
+        allow(RouteStrategies::Fastest).to receive(:new).with(data_repository).and_return(mock_strategy)
 
         service.find_route('ESBCN', 'BRSSZ', 'fastest')
 
@@ -93,7 +93,7 @@ RSpec.describe RouteFinderService do
       end
 
       it 'handles single character port codes' do
-        allow(RouteStrategies::FastestStrategy).to receive(:new).with(data_repository).and_return(mock_strategy)
+        allow(RouteStrategies::Fastest).to receive(:new).with(data_repository).and_return(mock_strategy)
 
         service.find_route('A', 'B', 'fastest')
 
@@ -105,9 +105,9 @@ RSpec.describe RouteFinderService do
   describe 'STRATEGY_MAP constant' do
     it 'contains all expected strategy mappings' do
       expect(described_class::STRATEGY_MAP).to include(
-        'fastest' => RouteStrategies::FastestStrategy,
-        'cheapest' => RouteStrategies::CheapestStrategy,
-        'cheapest-direct' => RouteStrategies::CheapestDirectStrategy
+        'fastest' => RouteStrategies::Fastest,
+        'cheapest' => RouteStrategies::Cheapest,
+        'cheapest-direct' => RouteStrategies::CheapestDirect
       )
     end
 
@@ -264,10 +264,10 @@ RSpec.describe RouteFinderService do
 
   describe 'error handling' do
     context 'when strategy raises an error' do
-      let(:mock_strategy) { instance_double(RouteStrategies::FastestStrategy) }
+      let(:mock_strategy) { instance_double(RouteStrategies::Fastest) }
 
       before do
-        allow(RouteStrategies::FastestStrategy).to receive(:new).with(data_repository).and_return(mock_strategy)
+        allow(RouteStrategies::Fastest).to receive(:new).with(data_repository).and_return(mock_strategy)
         allow(mock_strategy).to receive(:find_route).and_raise(StandardError, 'Strategy error')
       end
 

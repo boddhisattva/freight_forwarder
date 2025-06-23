@@ -1,5 +1,5 @@
 module RouteStrategies
-  class CheapestDirectStrategy < BaseStrategy
+  class CheapestDirect < Base
     def find_route(origin, destination)
       sailings = @repository.find_direct_sailings(origin, destination)
 

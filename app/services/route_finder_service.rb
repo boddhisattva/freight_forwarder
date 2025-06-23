@@ -1,8 +1,8 @@
 class RouteFinderService
   STRATEGY_MAP = {
-    "cheapest-direct" => RouteStrategies::CheapestDirectStrategy,
-    "cheapest" => RouteStrategies::CheapestStrategy,
-    "fastest" => RouteStrategies::FastestStrategy
+    "cheapest-direct" => RouteStrategies::CheapestDirect,
+    "cheapest" => RouteStrategies::Cheapest,
+    "fastest" => RouteStrategies::Fastest
   }.freeze
 
   def initialize(data_repository: DataRepository.new)

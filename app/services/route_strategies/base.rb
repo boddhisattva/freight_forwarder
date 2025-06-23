@@ -1,5 +1,5 @@
 module RouteStrategies
-  class BaseStrategy
+  class Base
     def initialize(repository, currency_converter: CurrencyConverter.new)
       @repository = repository
       @currency_converter = currency_converter

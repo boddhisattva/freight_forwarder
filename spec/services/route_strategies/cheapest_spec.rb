@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe RouteStrategies::CheapestStrategy do
+RSpec.describe RouteStrategies::Cheapest do
   subject(:strategy) { described_class.new(repository) }
   let(:repository) { DataRepository.new }
 
