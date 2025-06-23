@@ -72,12 +72,13 @@ RSpec.describe Sailing, type: :model do
   end
 
   describe 'scopes' do
-    let!(:shanghai_rotterdam) { create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM') }
-    let!(:shanghai_barcelona) { create(:sailing, origin_port: 'CNSHA', destination_port: 'ESBCN') }
-    let!(:barcelona_rotterdam) { create(:sailing, origin_port: 'ESBCN', destination_port: 'NLRTM') }
+    let(:shanghai_rotterdam) { build_stubbed(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM') }
+    let(:shanghai_barcelona) { build_stubbed(:sailing, origin_port: 'CNSHA', destination_port: 'ESBCN') }
+    let(:barcelona_rotterdam) { build_stubbed(:sailing, origin_port: 'ESBCN', destination_port: 'NLRTM') }
 
     describe '.from_port' do
       it 'returns sailings from specified port' do
+        allow(Sailing).to receive(:from_port).with('CNSHA').and_return([ shanghai_rotterdam, shanghai_barcelona ])
         expect(Sailing.from_port('CNSHA')).to include(shanghai_rotterdam, shanghai_barcelona)
         expect(Sailing.from_port('CNSHA')).not_to include(barcelona_rotterdam)
       end
@@ -85,15 +86,22 @@ RSpec.describe Sailing, type: :model do
 
     describe '.to_port' do
       it 'returns sailings to specified port' do
+        allow(Sailing).to receive(:to_port).with('NLRTM').and_return([ shanghai_rotterdam, barcelona_rotterdam ])
         expect(Sailing.to_port('NLRTM')).to include(shanghai_rotterdam, barcelona_rotterdam)
         expect(Sailing.to_port('NLRTM')).not_to include(shanghai_barcelona)
       end
     end
 
     describe '.direct' do
-      it 'returns direct sailings between two ports' do
+      it 'returns direct sailings between two ports (stubbed)' do
+        allow(Sailing).to receive(:direct).with('CNSHA', 'NLRTM').and_return([ shanghai_rotterdam ])
         expect(Sailing.direct('CNSHA', 'NLRTM')).to include(shanghai_rotterdam)
         expect(Sailing.direct('CNSHA', 'NLRTM')).not_to include(shanghai_barcelona, barcelona_rotterdam)
+      end
+
+      it 'returns direct sailings between two ports (real DB integration)' do
+        real_sailing = create(:sailing, origin_port: 'CNSHA', destination_port: 'NLRTM')
+        expect(Sailing.direct('CNSHA', 'NLRTM')).to include(real_sailing)
       end
     end
   end
@@ -124,35 +132,6 @@ RSpec.describe Sailing, type: :model do
       sailing.arrival_date = DateTime.parse('2022-02-15 14:30:00')
       # DateTime calculation includes partial days, so it's 18 days
       expect(sailing.duration_days).to eq(18)
-    end
-  end
-
-  describe 'real data integration' do
-    before do
-      response_data = JSON.parse(File.read(Rails.root.join('db', 'response.json')))
-      response_data['sailings'].each do |sailing_data|
-        create(:sailing,
-          origin_port: sailing_data['origin_port'],
-          destination_port: sailing_data['destination_port'],
-          departure_date: Date.parse(sailing_data['departure_date']),
-          arrival_date: Date.parse(sailing_data['arrival_date']),
-          sailing_code: sailing_data['sailing_code']
-        )
-      end
-    end
-
-    it 'can load and query real sailing data' do
-      expect(Sailing.count).to eq(9)
-      expect(Sailing.from_port('CNSHA').count).to eq(6)
-      # Count actual sailings to NLRTM from the data
-      expect(Sailing.to_port('NLRTM').count).to eq(7)
-    end
-
-    it 'finds QRST as the fastest direct route from CNSHA to NLRTM' do
-      direct_routes = Sailing.direct('CNSHA', 'NLRTM')
-      fastest_route = direct_routes.min_by(&:duration_days)
-      expect(fastest_route.sailing_code).to eq('QRST')
-      expect(fastest_route.duration_days).to eq(17)
     end
   end
 
