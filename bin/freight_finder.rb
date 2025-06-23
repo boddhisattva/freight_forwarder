@@ -2,6 +2,8 @@
 require_relative '../config/environment'
 require 'pry-byebug' if Rails.env.development?
 
+class InvalidInputError < StandardError; end
+
 class FreightFinderCLI
   def run
     load_sample_data
@@ -9,8 +11,8 @@ class FreightFinderCLI
     puts "Please enter origin port, destination port and criteria, each separated by a newline(press enter after each input)"
 
     # Read three lines of input safely
-    origin_port = read_input("origin port")
-    destination_port = read_input("destination port")
+    origin_port = read_and_validate_port("origin port")
+    destination_port = read_and_validate_port("destination port")
     criteria = read_input("criteria")
 
     # Debug breakpoint if needed
@@ -28,6 +30,31 @@ class FreightFinderCLI
   end
 
   private
+
+  def read_and_validate_port(port_type)
+    port = read_input(port_type)
+
+    unless valid_port?(port)
+      available_ports = get_available_ports.join(", ")
+      raise InvalidInputError,
+        "Invalid #{port_type} '#{port}'. Available ports: #{available_ports}"
+    end
+
+    port
+  end
+
+  def valid_port?(port_code)
+    get_available_ports.include?(port_code)
+  end
+
+  def get_available_ports
+    @available_ports ||= begin
+      origin_ports = Sailing.distinct.pluck(:origin_port)
+      destination_ports = Sailing.distinct.pluck(:destination_port)
+      (origin_ports + destination_ports).uniq.sort
+    end
+  end
+
 
   def read_input(name)
     line = STDIN.gets
