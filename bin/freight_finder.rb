@@ -4,7 +4,7 @@ require 'pry-byebug' if Rails.env.development?
 
 class InvalidInputError < StandardError; end
 
-class FreightFinderCLI
+class FreightFinder
   def run
     load_sample_data
 
@@ -98,5 +98,5 @@ end
 
 # Run CLI when file executed directly
 if __FILE__ == $0
-  FreightFinderCLI.new.run
+  FreightFinder.new.run
 end
