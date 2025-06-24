@@ -28,7 +28,7 @@ class FreightDataLoader
   end
 
   def freight_data_file_path
-    Rails.root.join('db', 'response.json')
+    Rails.root.join("db", "response.json")
   end
 
   def ensure_freight_file_exists(file_path)
