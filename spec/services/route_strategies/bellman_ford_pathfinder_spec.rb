@@ -12,9 +12,9 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
 
     context 'with direct routes' do
       it 'finds direct route successfully' do
-        graph = build_direct_route_graph
+        shipping_network = build_direct_route_shipping_network
 
-        result = pathfinder.find_cheapest_path(graph, 'CNSHA', 'NLRTM', cost_calculator)
+        result = pathfinder.find_cheapest_path(shipping_network, 'CNSHA', 'NLRTM', cost_calculator)
 
         expect(result.length).to eq(1)
         expect(result.first.sailing_code).to eq('ABCD')
@@ -23,9 +23,9 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
 
     context 'with multi-hop routes' do
       it 'chooses cheaper multi-hop over expensive direct route' do
-        graph = build_multi_hop_vs_direct_graph
+        shipping_network = build_multi_hop_vs_direct_shipping_network
 
-        result = pathfinder.find_cheapest_path(graph, 'CNSHA', 'NLRTM', cost_calculator)
+        result = pathfinder.find_cheapest_path(shipping_network, 'CNSHA', 'NLRTM', cost_calculator)
 
         # Multi-hop via Barcelona: €261.96 + €60.93 = €322.89 < €410.11 direct
         expect(result.length).to eq(2)
@@ -33,9 +33,9 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
       end
 
       it 'handles complex multi-leg routing with 4+ legs' do
-        graph = build_four_leg_route_graph
+        shipping_network = build_four_leg_route_shipping_network
 
-        result = pathfinder.find_cheapest_path(graph, 'CNSHA', 'USNYC', cost_calculator)
+        result = pathfinder.find_cheapest_path(shipping_network, 'CNSHA', 'USNYC', cost_calculator)
 
         # 4-leg route: €150 + €80 + €120 + €90 = €440 vs direct €2000
         expect(result.length).to eq(4)
@@ -45,10 +45,10 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
 
     context 'with connection timing constraints' do
       it 'respects invalid connections and finds alternative routes' do
-        graph_data = build_multi_hop_vs_direct_graph_with_sailings
-        graph = graph_data[:graph]
-        shanghai_sailing = graph_data[:shanghai_sailing]
-        barcelona_sailing = graph_data[:barcelona_sailing]
+        shipping_network_data = build_multi_hop_vs_direct_shipping_network_with_sailings
+        shipping_network = shipping_network_data[:shipping_network]
+        shanghai_sailing = shipping_network_data[:shanghai_sailing]
+        barcelona_sailing = shipping_network_data[:barcelona_sailing]
 
         # Break the Barcelona connection
         allow(cost_calculator).to receive(:valid_connection?)
@@ -56,7 +56,7 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
         allow(cost_calculator).to receive(:valid_connection?)
           .with(shanghai_sailing, barcelona_sailing).and_return(false)
 
-        result = pathfinder.find_cheapest_path(graph, 'CNSHA', 'NLRTM', cost_calculator)
+        result = pathfinder.find_cheapest_path(shipping_network, 'CNSHA', 'NLRTM', cost_calculator)
 
         # Should fallback to direct route when multi-hop connection invalid
         expect(result.length).to eq(1)
@@ -66,23 +66,23 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
 
     context 'with edge cases' do
       it 'returns empty array for unreachable destinations' do
-        graph = build_direct_route_graph
+        shipping_network = build_direct_route_shipping_network
 
-        result = pathfinder.find_cheapest_path(graph, 'CNSHA', 'UNKNOWN', cost_calculator)
+        result = pathfinder.find_cheapest_path(shipping_network, 'CNSHA', 'UNKNOWN', cost_calculator)
 
         expect(result).to eq([])
       end
 
-      it 'handles empty graph gracefully' do
+      it 'handles empty shipping_network gracefully' do
         result = pathfinder.find_cheapest_path({}, 'CNSHA', 'NLRTM', cost_calculator)
 
         expect(result).to eq([])
       end
 
       it 'handles same origin and destination' do
-        graph = { 'CNSHA' => [] }
+        shipping_network = { 'CNSHA' => [] }
 
-        result = pathfinder.find_cheapest_path(graph, 'CNSHA', 'CNSHA', cost_calculator)
+        result = pathfinder.find_cheapest_path(shipping_network, 'CNSHA', 'CNSHA', cost_calculator)
 
         expect(result).to eq([])
       end
@@ -91,7 +91,7 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
 
   private
 
-  def build_direct_route_graph
+  def build_direct_route_shipping_network
     sailing = build_stubbed(:sailing,
       origin_port: 'CNSHA',
       destination_port: 'NLRTM',
@@ -111,7 +111,7 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
     }
   end
 
-  def build_multi_hop_vs_direct_graph
+  def build_multi_hop_vs_direct_shipping_network
     shanghai_sailing = build_stubbed(:sailing,
       origin_port: 'CNSHA',
       destination_port: 'ESBCN',
@@ -159,7 +159,7 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
     }
   end
 
-  def build_four_leg_route_graph
+  def build_four_leg_route_shipping_network
     leg1_sailing = build_stubbed(:sailing, sailing_code: 'LEG1', origin_port: 'CNSHA', destination_port: 'ESBCN')
     leg2_sailing = build_stubbed(:sailing, sailing_code: 'LEG2', origin_port: 'ESBCN', destination_port: 'NLRTM')
     leg3_sailing = build_stubbed(:sailing, sailing_code: 'LEG3', origin_port: 'NLRTM', destination_port: 'BRSSZ')
@@ -213,7 +213,7 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
     }
   end
 
-  def build_multi_hop_vs_direct_graph_with_sailings
+  def build_multi_hop_vs_direct_shipping_network_with_sailings
     shanghai_sailing = build_stubbed(:sailing,
       origin_port: 'CNSHA',
       destination_port: 'ESBCN',
@@ -232,7 +232,7 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
       sailing_code: 'MNOP'
     )
 
-    graph = {
+    shipping_network = {
       'CNSHA' => [
         {
           sailing: shanghai_sailing,
@@ -261,7 +261,7 @@ RSpec.describe RouteStrategies::BellmanFordPathfinder do
     }
 
     {
-      graph: graph,
+      shipping_network: shipping_network,
       shanghai_sailing: shanghai_sailing,
       barcelona_sailing: barcelona_sailing,
       direct_sailing: direct_sailing
