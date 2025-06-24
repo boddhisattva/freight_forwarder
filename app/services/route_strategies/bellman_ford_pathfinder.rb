@@ -49,6 +49,9 @@ module RouteStrategies
     end
 
     def find_optimal_shipping_routes(shipping_routes, state, cost_calculator)
+      # Imagine you have 4 friends in a line and you want to pass a message to the last friend.
+      # You need 3 passess max (4 people - 1) to pass the message to the last friend.
+      # Same with ports, with 4 ports, we need max 3 rounds to find the best route
       (state[:all_shipping_ports].length - 1).times do |round|
         updated = false
 
