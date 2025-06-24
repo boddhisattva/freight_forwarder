@@ -20,21 +20,21 @@ done
 
 # Create test database and run migrations
 echo "🔨 Setting up test database..."
-docker-compose -f docker-compose.test.yml run --rm test bundle exec rails db:create db:migrate RAILS_ENV=test
+docker-compose -f docker-compose.test.yml run --rm -e RAILS_ENV=test test bundle exec rails db:create db:migrate
 
 echo ""
 echo "🎉 Test environment setup completed (with authentication)!"
 echo ""
 echo "🧪 To run all tests:"
-echo "docker-compose -f docker-compose.test.yml --profile test run --rm test"
+echo "docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test"
 echo ""
 echo "🧪 To run specific test files:"
-echo "docker-compose -f docker-compose.test.yml --profile test run --rm test bundle exec rspec spec/models/"
-echo "docker-compose -f docker-compose.test.yml --profile test run --rm test bundle exec rspec spec/repositories/"
-echo "docker-compose -f docker-compose.test.yml --profile test run --rm test bundle exec rspec spec/services/"
+echo "docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test bundle exec rspec spec/models/"
+echo "docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test bundle exec rspec spec/repositories/"
+echo "docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test bundle exec rspec spec/services/"
 echo ""
 echo "🧪 To run tests with specific options:"
-echo "docker-compose -f docker-compose.test.yml --profile test run --rm test bundle exec rspec --format documentation"
+echo "docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test bundle exec rspec --format documentation"
 echo ""
 echo "To stop services:"
 echo "docker-compose -f docker-compose.test.yml down"

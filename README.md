@@ -14,7 +14,7 @@ One can find the detailed problem statement [here](https://github.com/boddhisatt
 
 ### Run Freight Forwarder app in CLI mode with Docker
 
-1. Make sure you have Docker running locally
+1. **Make sure you have Docker app running locally**
 
 2. **Make scripts executable:**
    ```bash
@@ -30,11 +30,23 @@ One can find the detailed problem statement [here](https://github.com/boddhisatt
    ./setup_freight_finder.sh
    ```
 
-4. To run the app with Docker:
+**Please note**: `./setup_freight_finder.sh` also runs `rails db:seed` to load data present in `db/response.json`
+
+4. **To run the app with Docker:**
 
 ```
-docker-compose run --rm freight_finder ruby bin/freight_finder.rb
+docker-compose run --rm -T -e RAILS_ENV=development freight_finder ruby bin/freight_finder.rb
 ```
+
+A small side note for one's kind notice: In containerized environments(and many other places in life), explicit is always better than implicit, hence explicitly specifying `RAILS_ENV=development` above.
+
+**Please note**:
+1. `MAX_HOPS` represents the the maximum number of stops (or 'hops') allowed between the origin and destination ports
+  - `MAX_HOPS` currently defaults to a value of 4 & is made configurable through below ways:
+    - For production deployments `MAX_HOPS` can be set via an environment variable. This updates `config.max_hops` in `config/application.rb` and it requires redeploy/restart of server to take an updated value.
+    - When using Docker `MAX_HOPS`, one can update this via
+      - `docker-compose.yml`
+      - `docker-compose.test.yml`
 
 ### Running Tests with Docker
 
@@ -45,16 +57,16 @@ docker-compose run --rm freight_finder ruby bin/freight_finder.rb
 
 2. **Run all tests:**
    ```bash
-   docker-compose -f docker-compose.test.yml --profile test run --rm test
+   docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test
    ```
 
 3. **Run specific test file(s):**
    ```bash
    # Models only
-   docker-compose -f docker-compose.test.yml --profile test run --rm test bundle exec rspec spec/models/
+   docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test bundle exec rspec spec/models/
 
    # Specific test file
-   docker-compose -f docker-compose.test.yml --profile test run --rm test bundle exec rspec spec/models/sailing_spec.rb
+   docker-compose -f docker-compose.test.yml --profile test run --rm -e RAILS_ENV=test test bundle exec rspec spec/models/sailing_spec.rb
    ```
 
 ### Local Development Setup
@@ -74,7 +86,7 @@ docker-compose run --rm freight_finder ruby bin/freight_finder.rb
 * Run from the project root directory: `rake db:create` and `rake db:migrate`
 
 #### Data Setup
-* The application uses real shipping data stored in `db/response.json` . This is auto loaded when you run the below code command in next step
+* Please run `rake db:seed` to load freight data available in `db/response.json`
 
 #### Running the Rails app in CLI mode with
 
@@ -90,17 +102,24 @@ ruby bin/freight_finder.rb
   - Add Centralized error Handling for cases like Sailings without rates
   - Propagate  & clearly list insertion failures of Sailings & related data that are added through sources like `db/response.json`
 * Bellman Ford Algorithm logic can be extended further to care of scenarios like discounts
-* Record Insertion can be improved further to handle
-  - bulk insert scenarios when we have a lot of data to import
-  - proactively dealing with inconsistent data like Sailings without rates/exchange rates
-*
+* Record Insertion can be improved further to
+  - handle bulk insert scenarios when we have a lot of data to import
+  - proactively deal with inconsistent data like Sailings without rates/exchange rates
+* Exchange Rates can be cached in advance
+* Improve priority queue implementation by replacing Array with Min Heap implementation
 
 ## Design considerations: To Update(Kindly allow me some time to update this please)
 * Bellman Ford Algorithm allows to take discounts etc., & hence it's better suited than Depth First Search for finding Cheapest Route
-* Adherance to SOLID principles for more object oriented code
+* Adherance to SOLID principles, proactively using smaller classes for more object oriented code
+* Using a Repository pattern(with relevant directory structure) and Template Method Pattern as appropriate for various entities as needed
+* Actively used Composition for various classes where applicable
+* Money Related operations and handlng made easier by storing values as cents(Credits: Money Rails Gem is very helpful here)
 
 
 ## Performance considerations: To Update(Kindly allow me some time to update this please)
 * Reachability Pruning(via `PortConnectivityFilter`) used to get required Sailings based on origin & destination port instead of having to load all Sailings
 * `build_stubbed` is used at various places for faster specs
 * Indexes have also been added for faster DB lookups
+
+## Other Considerations
+* Code comments have been added selectively to attempt to explain more challenging parts for ease of understanding for future developers enhancing & maintaining the app
