@@ -141,38 +141,48 @@ RSpec.describe RouteStrategies::Fastest do
 
   context 'real DB integration' do
     before do
-      response_data = JSON.parse(File.read(Rails.root.join('db', 'response.json')))
-      response_data['sailings'].each do |sailing_data|
-        create(:sailing,
-          origin_port: sailing_data['origin_port'],
-          destination_port: sailing_data['destination_port'],
-          departure_date: Date.parse(sailing_data['departure_date']),
-          arrival_date: Date.parse(sailing_data['arrival_date']),
-          sailing_code: sailing_data['sailing_code']
-        )
-      end
-      response_data['rates'].each do |rate_data|
-        sailing = Sailing.find_by(sailing_code: rate_data['sailing_code'])
-        next unless sailing
-        rate_in_cents = (BigDecimal(rate_data['rate']) * 100).to_i
-        create(:rate,
-          sailing: sailing,
-          amount_cents: rate_in_cents,
-          currency: rate_data['rate_currency']
-        )
-      end
-      response_data['exchange_rates'].each do |date, rates|
-        create(:exchange_rate,
-          departure_date: Date.parse(date),
-          currency: 'usd',
-          rate: BigDecimal(rates['usd'].to_s)
-        )
-        create(:exchange_rate,
-          departure_date: Date.parse(date),
-          currency: 'jpy',
-          rate: BigDecimal(rates['jpy'].to_s)
-        )
-      end
+      create(:sailing,
+        origin_port: 'CNSHA', destination_port: 'NLRTM',
+        departure_date: '2022-01-29', arrival_date: '2022-02-15', # 17 days - fastest
+        sailing_code: 'QRST'
+      )
+      create(:sailing,
+        origin_port: 'CNSHA', destination_port: 'NLRTM',
+        departure_date: '2022-01-30', arrival_date: '2022-03-05', # 34 days - slower
+        sailing_code: 'MNOP'
+      )
+      create(:sailing,
+        origin_port: 'CNSHA', destination_port: 'NLRTM',
+        departure_date: '2022-01-31', arrival_date: '2022-02-28', # 28 days - slower
+        sailing_code: 'IJKL'
+      )
+
+      # For CNSHA->BRSSZ multi-hop route (CNSHA->ESBCN->BRSSZ)
+      create(:sailing,
+        origin_port: 'CNSHA', destination_port: 'ESBCN',
+        departure_date: '2022-01-29', arrival_date: '2022-02-12', # 14 days
+        sailing_code: 'ERXQ'
+      )
+      create(:sailing,
+        origin_port: 'ESBCN', destination_port: 'BRSSZ',
+        departure_date: '2022-02-16', arrival_date: '2022-03-14', # 26 days total
+        sailing_code: 'ETRB'
+      )
+
+      create(:rate, sailing: Sailing.find_by(sailing_code: 'QRST'), amount_cents: 76196, currency: 'EUR')
+      create(:rate, sailing: Sailing.find_by(sailing_code: 'MNOP'), amount_cents: 45678, currency: 'USD')
+      create(:rate, sailing: Sailing.find_by(sailing_code: 'IJKL'), amount_cents: 97453, currency: 'JPY')
+      create(:rate, sailing: Sailing.find_by(sailing_code: 'ERXQ'), amount_cents: 26196, currency: 'EUR')
+      create(:rate, sailing: Sailing.find_by(sailing_code: 'ETRB'), amount_cents: 43996, currency: 'USD')
+
+      create(:exchange_rate, departure_date: '2022-01-29', currency: 'usd', rate: 1.1138)
+      create(:exchange_rate, departure_date: '2022-01-29', currency: 'jpy', rate: 130.85)
+      create(:exchange_rate, departure_date: '2022-01-30', currency: 'usd', rate: 1.1138)
+      create(:exchange_rate, departure_date: '2022-01-30', currency: 'jpy', rate: 132.97)
+      create(:exchange_rate, departure_date: '2022-01-31', currency: 'usd', rate: 1.1156)
+      create(:exchange_rate, departure_date: '2022-01-31', currency: 'jpy', rate: 131.2)
+      create(:exchange_rate, departure_date: '2022-02-16', currency: 'usd', rate: 1.1482)
+      create(:exchange_rate, departure_date: '2022-02-16', currency: 'jpy', rate: 149.93)
     end
 
     it 'finds the fastest route from CNSHA to NLRTM (QRST)' do
