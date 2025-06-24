@@ -97,7 +97,7 @@ ruby bin/freight_finder.rb
 #### Running the tests
 * Run from the project's root directory the `rspec` command
 
-## Areas of Improvement: To Update(Kindly allow me some time to update this please)
+## Areas of Improvement:
 * Error Handling and Reporting Improvements
   - Add Centralized error Handling for cases like Sailings without rates
   - Propagate  & clearly list insertion failures of Sailings & related data that are added through sources like `db/response.json`
@@ -108,7 +108,7 @@ ruby bin/freight_finder.rb
 * Exchange Rates can be cached in advance
 * Improve priority queue implementation by replacing Array with Min Heap implementation
 
-## Design considerations: To Update(Kindly allow me some time to update this please)
+## Design considerations:
 * Bellman Ford Algorithm allows to take discounts etc., & hence it's better suited than Depth First Search for finding Cheapest Route
 * Adherance to SOLID principles, proactively using smaller classes for more object oriented code
 * Using a Repository pattern(with relevant directory structure) and Template Method Pattern as appropriate for various entities as needed
@@ -116,7 +116,7 @@ ruby bin/freight_finder.rb
 * Money Related operations and handlng made easier by storing values as cents(Credits: Money Rails Gem is very helpful here)
 
 
-## Performance considerations: To Update(Kindly allow me some time to update this please)
+## Performance considerations:
 * Reachability Pruning(via `PortConnectivityFilter`) used to get required Sailings based on origin & destination port instead of having to load all Sailings
 * `build_stubbed` is used at various places for faster specs
 * Indexes have also been added for faster DB lookups
